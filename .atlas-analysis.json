@@ -1,0 +1,145 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Windows-MCP",
+  "projectDescription": "MCP Server for Computer Use in Windows - enables AI agents to interact with the Windows operating system through 15 automation tools.",
+  "theme": "aspen",
+  "primaryColor": "#f58a23",
+  "lightColor": "#fbb86e",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/modes",
+              "concepts/tools-overview"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/mcp-clients",
+              "configuration/transport-options",
+              "configuration/environment-variables"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/browser-automation",
+              "guides/file-operations",
+              "guides/process-management",
+              "guides/advanced-usage"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Desktop Interaction",
+            "pages": [
+              "api/snapshot",
+              "api/click",
+              "api/type",
+              "api/scroll",
+              "api/move",
+              "api/shortcut",
+              "api/wait"
+            ]
+          },
+          {
+            "group": "Application Management",
+            "pages": [
+              "api/app",
+              "api/shell",
+              "api/filesystem"
+            ]
+          },
+          {
+            "group": "Advanced Tools",
+            "pages": [
+              "api/scrape",
+              "api/multi-select",
+              "api/multi-edit",
+              "api/clipboard",
+              "api/process",
+              "api/notification",
+              "api/registry"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/desktop-service",
+              "architecture/tree-service",
+              "architecture/uia-wrapper",
+              "architecture/watchdog"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Security",
+            "pages": [
+              "security/security-policy",
+              "security/telemetry"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/contributing",
+              "development/testing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Seamless Windows Integration - Interacts natively with Windows UI elements, opens apps, controls windows, simulates user input",
+    "Works with Any LLM - No computer vision or fine-tuned models required, reducing complexity and setup time",
+    "Rich Toolset - 15 tools for UI automation including keyboard, mouse, window management, and system operations",
+    "Lightweight & Open-Source - Minimal dependencies with full source code under MIT license",
+    "Real-Time Interaction - 0.2-0.9 second latency between actions depending on system load",
+    "DOM Mode for Browsers - Special mode for web automation that filters browser UI for cleaner web page interaction",
+    "Local & Remote Modes - Run directly on Windows or connect to cloud-hosted Windows VMs via windowsmcp.io",
+    "Multiple Transport Options - Supports stdio, SSE, and streamable HTTP for flexible integration"
+  ],
+  "publicApiSurface": [
+    "Snapshot - Capture desktop state, UI elements, and screenshots",
+    "Click - Perform mouse clicks at coordinates or UI elements",
+    "Type - Enter text at specified locations with keyboard simulation",
+    "Scroll - Scroll vertically or horizontally in windows and regions",
+    "Move - Move mouse cursor or perform drag-and-drop operations",
+    "Shortcut - Execute keyboard shortcuts (Ctrl+C, Alt+Tab, etc.)",
+    "Wait - Pause execution for specified duration",
+    "App - Launch applications, resize windows, and switch focus",
+    "Shell - Execute PowerShell commands with full system access",
+    "FileSystem - Read, write, copy, move, delete, list, and search files",
+    "Scrape - Fetch and extract web page content from URLs or browser DOM",
+    "MultiSelect - Select multiple items like files or checkboxes",
+    "MultiEdit - Enter text into multiple input fields",
+    "Clipboard - Read and set Windows clipboard content",
+    "Process - List running processes and terminate by PID or name",
+    "Notification - Send Windows toast notifications",
+    "Registry - Read, write, delete, and list Windows Registry keys and values"
+  ]
+}
