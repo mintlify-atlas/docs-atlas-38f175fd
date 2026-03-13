@@ -1,0 +1,426 @@
+---
+title: Testing
+description: Guide to testing Windows-MCP
+icon: flask
+---
+
+Windows-MCP uses **pytest** for testing. This guide covers running tests, writing new tests, and understanding the test structure.
+
+## Running Tests
+
+### Run All Tests
+
+```bash
+pytest
+```
+
+This will discover and run all tests in the `tests/` directory.
+
+### Run Specific Test Files
+
+```bash
+# Run a single test file
+pytest tests/test_desktop_views.py
+
+# Run multiple specific files
+pytest tests/test_tree_views.py tests/test_tree_service.py
+```
+
+### Run Tests with Coverage
+
+```bash
+# Run with coverage report
+pytest --cov=src tests/
+
+# Generate HTML coverage report
+pytest --cov=src --cov-report=html tests/
+```
+
+The HTML report will be generated in the `htmlcov/` directory.
+
+### Run Tests in Verbose Mode
+
+```bash
+# Show detailed output
+pytest -v
+
+# Show even more detail (print statements, etc.)
+pytest -vv
+```
+
+### Run Tests Matching a Pattern
+
+```bash
+# Run tests with names matching a pattern
+pytest -k "test_browser"
+
+# Run tests NOT matching a pattern
+pytest -k "not test_slow"
+```
+
+## Test Structure
+
+The test suite is organized to mirror the source code structure:
+
+```
+tests/
+├── __init__.py
+├── conftest.py                    # Shared fixtures
+├── test_analytics.py              # Analytics tests
+├── test_auth_service.py           # Authentication service tests
+├── test_desktop_views.py          # Desktop data model tests
+├── test_filesystem_service.py     # File system service tests
+├── test_filesystem_views.py       # File system data model tests
+├── test_registry.py               # Windows registry tests
+├── test_snapshot_display_filter.py # Snapshot filtering tests
+├── test_tree_service.py           # Tree service tests
+└── test_tree_views.py             # Tree data model tests
+```
+
+### Test Configuration
+
+Test configuration is defined in `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+```
+
+- **testpaths**: Specifies the directory containing tests
+- **asyncio_mode**: Automatically handles async tests
+
+## Writing Tests
+
+### Basic Test Structure
+
+Tests are organized into classes by feature or component:
+
+```python
+class TestBrowser:
+    def test_has_process_chrome(self):
+        assert Browser.has_process("chrome.exe") is True
+
+    def test_has_process_edge(self):
+        assert Browser.has_process("msedge.exe") is True
+
+    def test_has_process_unknown(self):
+        assert Browser.has_process("notepad.exe") is False
+```
+
+### Using Fixtures
+
+Fixtures provide reusable test data. Shared fixtures are defined in `tests/conftest.py`:
+
+```python
+import pytest
+from windows_mcp.tree.views import BoundingBox, Center, TreeElementNode
+
+@pytest.fixture
+def sample_bounding_box():
+    return BoundingBox(left=100, top=50, right=300, bottom=150, width=200, height=100)
+
+@pytest.fixture
+def sample_center():
+    return Center(x=200, y=100)
+
+@pytest.fixture
+def sample_tree_element_node(sample_bounding_box, sample_center):
+    return TreeElementNode(
+        bounding_box=sample_bounding_box,
+        center=sample_center,
+        name="OK",
+        control_type="Button",
+        window_name="Notepad",
+        metadata={
+            "value": "",
+            "shortcut": "Alt+O",
+            "has_focused": True,
+        },
+    )
+```
+
+Use fixtures in your tests:
+
+```python
+def test_tree_element_properties(sample_tree_element_node):
+    assert sample_tree_element_node.name == "OK"
+    assert sample_tree_element_node.control_type == "Button"
+    assert sample_tree_element_node.window_name == "Notepad"
+```
+
+### Testing Data Models
+
+Test data model methods and properties:
+
+```python
+class TestSize:
+    def test_to_string_standard(self):
+        s = Size(width=1920, height=1080)
+        assert s.to_string() == "(1920,1080)"
+
+    def test_to_string_zero(self):
+        s = Size(width=0, height=0)
+        assert s.to_string() == "(0,0)"
+```
+
+### Testing with Exceptions
+
+Test that code raises expected exceptions:
+
+```python
+import pytest
+
+def test_click_tool_validates_coordinates():
+    """Test that click_tool raises ValueError for invalid coordinates."""
+    with pytest.raises(ValueError, match="exactly 2 integers"):
+        click_tool([100])  # Missing y coordinate
+```
+
+### Testing Async Functions
+
+The test suite automatically handles async tests with `asyncio_mode = "auto"`:
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_async_function():
+    result = await some_async_function()
+    assert result is not None
+```
+
+### Mocking External Dependencies
+
+When testing code that interacts with Windows APIs or external systems, use mocks:
+
+```python
+from unittest.mock import Mock, patch
+
+def test_desktop_function_with_mock():
+    with patch('windows_mcp.desktop.service.some_windows_api') as mock_api:
+        mock_api.return_value = "mocked result"
+        result = desktop_function()
+        assert result == "mocked result"
+        mock_api.assert_called_once()
+```
+
+## Test Coverage
+
+### Viewing Coverage Reports
+
+After running tests with coverage:
+
+```bash
+pytest --cov=src --cov-report=html tests/
+```
+
+Open `htmlcov/index.html` in a browser to view the interactive coverage report.
+
+### Coverage Guidelines
+
+- Aim for high coverage on critical components
+- Focus on testing:
+  - Data models and views
+  - Business logic in services
+  - Input validation
+  - Error handling
+- Mock external dependencies (Windows APIs, file system, etc.)
+
+### Areas to Test
+
+1. **Data Models** (`*_views.py`)
+   - Property getters/setters
+   - String representations
+   - Serialization/deserialization
+
+2. **Services** (`*_service.py`)
+   - Core functionality
+   - Error handling
+   - Edge cases
+
+3. **Utilities**
+   - Helper functions
+   - Data transformations
+   - Validation logic
+
+4. **Integration Points**
+   - Tool functions in `__main__.py`
+   - Service interactions
+
+## Best Practices
+
+### Do's
+
+<Check>
+  - Write descriptive test names that explain what is being tested
+  - Use fixtures for reusable test data
+  - Test both success and failure cases
+  - Mock external dependencies (Windows APIs, file system)
+  - Keep tests focused and independent
+  - Add tests when fixing bugs to prevent regression
+</Check>
+
+### Don'ts
+
+<Warning>
+  - Don't test external libraries (pytest, comtypes, etc.)
+  - Don't make tests depend on each other
+  - Don't use sleep() or fixed delays
+  - Don't commit commented-out tests
+  - Don't test implementation details, test behavior
+</Warning>
+
+## Testing Guidelines
+
+### Unit Tests
+
+Test individual functions and classes in isolation:
+
+```python
+class TestDesktopState:
+    def test_active_window_to_string_none(self):
+        ds = DesktopState(
+            active_desktop={"name": "Desktop 1"},
+            all_desktops=[],
+            active_window=None,
+            windows=[],
+        )
+        assert ds.active_window_to_string() == "No active window found"
+```
+
+### Integration Tests
+
+Test interactions between components:
+
+```python
+def test_desktop_service_integration(sample_window):
+    """Test that desktop service correctly integrates with tree service."""
+    # Test integration between Desktop and Tree services
+    pass
+```
+
+### Safety Considerations
+
+<Warning>
+  Windows-MCP has **full system access** with no sandboxing. When testing:
+  
+  - Run tests in a **VM or Windows Sandbox**
+  - **Mock** Windows API calls that could modify the system
+  - Be careful with tests that:
+    - Launch applications
+    - Execute shell commands
+    - Modify the registry
+    - Click or type automatically
+</Warning>
+
+## Continuous Integration
+
+When setting up CI/CD:
+
+```yaml
+# Example GitHub Actions workflow
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+      - name: Run tests
+        run: pytest --cov=src tests/
+```
+
+## Debugging Tests
+
+### Run Tests with Python Debugger
+
+```bash
+# Drop into debugger on failure
+pytest --pdb
+
+# Drop into debugger at start of each test
+pytest --trace
+```
+
+### Print Output During Tests
+
+```bash
+# Show print statements
+pytest -s
+
+# Show print statements and verbose output
+pytest -sv
+```
+
+### Run Only Failed Tests
+
+```bash
+# Run tests that failed in the last run
+pytest --lf
+
+# Run failed tests first, then others
+pytest --ff
+```
+
+## Common Testing Patterns
+
+### Testing Enums
+
+```python
+class TestStatus:
+    def test_enum_values(self):
+        assert Status.MAXIMIZED.value == "Maximized"
+        assert Status.MINIMIZED.value == "Minimized"
+        assert Status.NORMAL.value == "Normal"
+        assert Status.HIDDEN.value == "Hidden"
+```
+
+### Testing String Formatting
+
+```python
+class TestWindow:
+    def test_to_row(self, sample_window):
+        row = sample_window.to_row()
+        assert row == ["Untitled - Notepad", 0, "Normal", 200, 100, 12345]
+```
+
+### Testing Edge Cases
+
+```python
+class TestDesktopState:
+    def test_windows_to_string_empty(self):
+        ds = DesktopState(
+            active_desktop={"name": "Desktop 1"},
+            all_desktops=[],
+            active_window=None,
+            windows=[],
+        )
+        assert ds.windows_to_string() == "No windows found"
+```
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="pytest Documentation" icon="book" href="https://docs.pytest.org/">
+    Official pytest documentation
+  </Card>
+  <Card title="pytest-asyncio" icon="bolt" href="https://pytest-asyncio.readthedocs.io/">
+    Testing async code with pytest
+  </Card>
+  <Card title="unittest.mock" icon="mask" href="https://docs.python.org/3/library/unittest.mock.html">
+    Python mocking library
+  </Card>
+  <Card title="pytest-cov" icon="chart-line" href="https://pytest-cov.readthedocs.io/">
+    Coverage reporting for pytest
+  </Card>
+</CardGroup>

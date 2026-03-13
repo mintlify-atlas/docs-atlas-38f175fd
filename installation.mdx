@@ -1,0 +1,486 @@
+---
+title: Installation
+description: Step-by-step installation instructions for Windows-MCP across all supported MCP clients
+---
+
+## Prerequisites
+
+Before installing Windows-MCP, ensure you have the following:
+
+<Steps>
+  <Step title="Python 3.13+">
+    Windows-MCP requires Python 3.13 or higher. Download from [python.org](https://www.python.org/downloads/).
+    
+    Verify your Python version:
+    ```bash
+    python --version
+    ```
+  </Step>
+  
+  <Step title="UV Package Manager (Recommended)">
+    UV is the recommended package manager for running Windows-MCP. Install with:
+    
+    <CodeGroup>
+    ```bash pip
+    pip install uv
+    ```
+    
+    ```bash curl
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Windows Language Setting">
+    English as the default Windows language is preferred. If using another language, you may need to disable the `App` tool in your configuration.
+  </Step>
+</Steps>
+
+<Note>
+On first installation, Windows-MCP may take 1-2 minutes to install dependencies from `pyproject.toml`. The server may timeout on first run - simply restart it if this occurs.
+</Note>
+
+## Installation Options
+
+Windows-MCP can be installed from PyPI (recommended) or from source. Choose the method that best fits your workflow.
+
+### Option A: Install from PyPI (Recommended)
+
+The easiest way to get started. Use `uvx` to run the latest version directly from PyPI without manual cloning.
+
+**Advantages:**
+- Always get the latest stable release
+- No manual updates required
+- Minimal setup time
+
+### Option B: Install from Source
+
+Ideal for development, testing, or contributing to Windows-MCP.
+
+**Advantages:**
+- Access to unreleased features
+- Ability to modify and extend tools
+- Contribute back to the project
+
+<Info>
+The configuration examples below show both PyPI and source installation methods for each client.
+</Info>
+
+## Claude Desktop
+
+<Steps>
+  <Step title="Install Claude Desktop">
+    Download and install [Claude Desktop](https://claude.ai/download) from Anthropic.
+    
+    Then install the MCP bridge:
+    ```bash
+    npm install -g @anthropic-ai/mcpb
+    ```
+  </Step>
+  
+  <Step title="Configure Windows-MCP">
+    Add Windows-MCP to your `claude_desktop_config.json` configuration file.
+    
+    <CodeGroup>
+    ```json PyPI (Recommended)
+    {
+      "mcpServers": {
+        "windows-mcp": {
+          "command": "uvx",
+          "args": [
+            "windows-mcp"
+          ]
+        }
+      }
+    }
+    ```
+    
+    ```json From Source
+    {
+      "mcpServers": {
+        "windows-mcp": {
+          "command": "uv",
+          "args": [
+            "--directory",
+            "C:\\path\\to\\Windows-MCP",
+            "run",
+            "windows-mcp"
+          ]
+        }
+      }
+    }
+    ```
+    </CodeGroup>
+    
+    Replace `C:\\path\\to\\Windows-MCP` with your actual repository path when using source installation.
+  </Step>
+  
+  <Step title="Restart Claude Desktop">
+    Close and reopen Claude Desktop. Windows-MCP tools should now be available.
+  </Step>
+</Steps>
+
+### Claude Desktop MSIX (Windows Store Version)
+
+<Warning>
+The MSIX-packaged version from the Windows Store has special configuration requirements due to app virtualization.
+</Warning>
+
+The Windows Store version virtualizes `%APPDATA%`, so the config file location differs:
+
+**Config Location:**
+```
+%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json
+```
+
+**Important Notes:**
+- The "Edit Config" button in Claude Desktop may open the **wrong file**
+- Navigate directly to the path above to edit the correct configuration
+- Electron apps don't inherit PATH, so `uvx` may fail with `spawn ENOENT`
+- **Use absolute paths** to `uv.exe` to avoid PATH issues
+
+**Example Configuration:**
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "C:\\Users\\YourUsername\\.local\\bin\\uv.exe",
+      "args": [
+        "--directory",
+        "C:\\Users\\YourUsername\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Claude Extensions\\ant.dir.cursortouch.windows-mcp",
+        "run",
+        "windows-mcp"
+      ]
+    }
+  }
+}
+```
+
+**Finding `uv.exe`:**
+```bash
+where uv
+```
+
+Common location: `%USERPROFILE%\.local\bin\uv.exe`
+
+<Tip>
+For PyPI install with MSIX version, use `args: ["run", "windows-mcp"]` instead of the `--directory` path.
+</Tip>
+
+**Save Format:** Save as **UTF-8 without BOM**. PowerShell's `Set-Content -Encoding UTF8` adds a BOM that breaks the JSON parser.
+
+For additional troubleshooting, see the [MCP documentation](https://modelcontextprotocol.io/quickstart/server#claude-for-desktop-integration-issues).
+
+## Perplexity Desktop
+
+<Steps>
+  <Step title="Install Perplexity Desktop">
+    Install [Perplexity Desktop](https://apps.microsoft.com/detail/xp8jnqfbqh6pvf) from the Microsoft Store.
+  </Step>
+  
+  <Step title="Clone Repository (if using source)">
+    If installing from source, clone the repository:
+    ```bash
+    git clone https://github.com/CursorTouch/Windows-MCP.git
+    cd Windows-MCP
+    ```
+  </Step>
+  
+  <Step title="Add Connector">
+    Open Perplexity Desktop and navigate to:
+    
+    **Settings → Connectors → Add Connector → Advanced**
+  </Step>
+  
+  <Step title="Configure Windows-MCP">
+    Enter the name as `Windows-MCP`, then paste the appropriate JSON configuration:
+    
+    <CodeGroup>
+    ```json PyPI (Recommended)
+    {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ]
+    }
+    ```
+    
+    ```json From Source
+    {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\path\\to\\Windows-MCP",
+        "run",
+        "windows-mcp"
+      ]
+    }
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Save and Test">
+    Click **Save**. Windows-MCP should now be available in Perplexity Desktop.
+  </Step>
+</Steps>
+
+For troubleshooting, see [Perplexity MCP Support](https://www.perplexity.ai/help-center/en/articles/11502712-local-and-remote-mcps-for-perplexity).
+
+## Gemini CLI
+
+<Steps>
+  <Step title="Install Gemini CLI">
+    Install the Gemini CLI tool globally using npm:
+    ```bash
+    npm install -g @google/gemini-cli
+    ```
+  </Step>
+  
+  <Step title="Edit Settings File">
+    Navigate to `%USERPROFILE%\.gemini` in File Explorer and open `settings.json`.
+    
+    <Tip>
+    If the file doesn't exist, run `gemini` once to create the default configuration.
+    </Tip>
+  </Step>
+  
+  <Step title="Add MCP Server Configuration">
+    Add the Windows-MCP configuration to the `mcpServers` section:
+    
+    <CodeGroup>
+    ```json PyPI (Recommended)
+    {
+      "theme": "Default",
+      "mcpServers": {
+        "windows-mcp": {
+          "command": "uvx",
+          "args": [
+            "windows-mcp"
+          ]
+        }
+      }
+    }
+    ```
+    
+    ```json From Source
+    {
+      "theme": "Default",
+      "mcpServers": {
+        "windows-mcp": {
+          "command": "uv",
+          "args": [
+            "--directory",
+            "C:\\path\\to\\Windows-MCP",
+            "run",
+            "windows-mcp"
+          ]
+        }
+      }
+    }
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Restart Gemini CLI">
+    Rerun the Gemini CLI in your terminal. Windows-MCP tools should now be available.
+  </Step>
+</Steps>
+
+## Qwen Code
+
+<Steps>
+  <Step title="Install Qwen Code">
+    Install Qwen Code globally using npm:
+    ```bash
+    npm install -g @qwen-code/qwen-code@latest
+    ```
+  </Step>
+  
+  <Step title="Edit Configuration">
+    Navigate to `%USERPROFILE%\.qwen\settings.json` and add the Windows-MCP configuration:
+    
+    <CodeGroup>
+    ```json PyPI (Recommended)
+    {
+      "mcpServers": {
+        "windows-mcp": {
+          "command": "uvx",
+          "args": [
+            "windows-mcp"
+          ]
+        }
+      }
+    }
+    ```
+    
+    ```json From Source
+    {
+      "mcpServers": {
+        "windows-mcp": {
+          "command": "uv",
+          "args": [
+            "--directory",
+            "C:\\path\\to\\Windows-MCP",
+            "run",
+            "windows-mcp"
+          ]
+        }
+      }
+    }
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Restart Qwen Code">
+    Rerun Qwen Code in your terminal.
+  </Step>
+</Steps>
+
+## Codex CLI
+
+<Steps>
+  <Step title="Install Codex CLI">
+    Install the Codex CLI tool:
+    ```bash
+    npm install -g @openai/codex
+    ```
+  </Step>
+  
+  <Step title="Edit Configuration">
+    Navigate to `%USERPROFILE%\.codex\config.toml` and add:
+    
+    <CodeGroup>
+    ```toml PyPI (Recommended)
+    [mcp_servers.windows-mcp]
+    command="uvx"
+    args=[
+      "windows-mcp"
+    ]
+    ```
+    
+    ```toml From Source
+    [mcp_servers.windows-mcp]
+    command="uv"
+    args=[
+      "--directory",
+      "C:\\path\\to\\Windows-MCP",
+      "run",
+      "windows-mcp"
+    ]
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Restart Codex CLI">
+    Rerun Codex CLI in your terminal.
+  </Step>
+</Steps>
+
+## Advanced Configuration
+
+### Disabling Telemetry
+
+Windows-MCP collects anonymous usage data to improve the server. No personal information, tool arguments, or outputs are tracked.
+
+To disable telemetry, add the `ANONYMIZED_TELEMETRY` environment variable:
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"],
+      "env": {
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+### Remote Mode Configuration
+
+To use cloud-hosted Windows VMs through [windowsmcp.io](https://windowsmcp.io):
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"],
+      "env": {
+        "MODE": "remote",
+        "SANDBOX_ID": "your-sandbox-id",
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+Get your Sandbox ID and API Key from the [windowsmcp.io dashboard](https://windowsmcp.io).
+
+### Network Transport Options
+
+By default, Windows-MCP uses stdio transport. For network access, you can use SSE or Streamable HTTP:
+
+<CodeGroup>
+```bash SSE Transport
+uvx windows-mcp --transport sse --host localhost --port 8000
+```
+
+```bash Streamable HTTP
+uvx windows-mcp --transport streamable-http --host localhost --port 8000
+```
+</CodeGroup>
+
+## Verification
+
+After installation, verify Windows-MCP is working:
+
+1. Open your MCP client (Claude Desktop, Perplexity, etc.)
+2. Look for Windows-MCP in the available tools/extensions
+3. Try a simple command: "Take a screenshot of my desktop"
+4. The client should use the `Snapshot` tool to capture your desktop state
+
+<Info>
+If you encounter issues, check the client's log files for error messages. Common issues include PATH problems, Python version mismatches, or configuration file formatting errors.
+</Info>
+
+## Troubleshooting
+
+### Server Timeout on First Run
+
+This is normal. Windows-MCP installs dependencies on first launch, which can take 1-2 minutes. Simply restart the client.
+
+### "spawn ENOENT" Error
+
+This occurs when the client can't find `uv` or `uvx` in the PATH. Use absolute paths to the executable:
+
+```bash
+where uv
+```
+
+Then use the full path in your configuration.
+
+### Config File Not Found
+
+Each client stores its config in a different location:
+
+- **Claude Desktop**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Claude MSIX**: `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
+- **Gemini CLI**: `%USERPROFILE%\.gemini\settings.json`
+- **Qwen Code**: `%USERPROFILE%\.qwen\settings.json`
+- **Codex CLI**: `%USERPROFILE%\.codex\config.toml`
+
+### Python Version Error
+
+Windows-MCP requires Python 3.13+. Upgrade Python and ensure `python --version` shows 3.13 or higher.
+
+## Next Steps
+
+Now that Windows-MCP is installed, learn how to use it with our quickstart guide:
+
+<Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+  Get your first automation running in minutes with a practical example.
+</Card>

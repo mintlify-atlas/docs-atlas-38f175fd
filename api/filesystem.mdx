@@ -1,0 +1,693 @@
+---
+title: FileSystem
+description: Structured file system operations with eight specialized modes
+---
+
+The **FileSystem** tool provides safe, structured file and directory operations. It offers eight distinct modes for reading, writing, copying, moving, deleting, listing, searching, and inspecting files and directories.
+
+## Overview
+
+The FileSystem tool is a safer, more structured alternative to raw PowerShell commands for common file operations. It includes built-in error handling, size limits, and user-friendly output formatting.
+
+<Info>
+  **Default Directory**: Relative paths are resolved from the user's Desktop folder. Use absolute paths (e.g., `C:\\Users\\...`) to access other locations.
+</Info>
+
+## Parameters
+
+<ParamField path="mode" type="Literal['read', 'write', 'copy', 'move', 'delete', 'list', 'search', 'info']" required>
+  Operation mode. See [Mode Details](#mode-details) for full documentation of each mode.
+</ParamField>
+
+<ParamField path="path" type="string" required>
+  File or directory path. Relative paths are resolved from the Desktop folder. Supports Windows path separators (`\\`) and forward slashes (`/`).
+</ParamField>
+
+<ParamField path="destination" type="string">
+  Destination path for `copy` and `move` modes. Required for these modes. Relative paths are resolved from the Desktop folder.
+</ParamField>
+
+<ParamField path="content" type="string">
+  Text content to write. Required for `write` mode.
+</ParamField>
+
+<ParamField path="pattern" type="string">
+  - **list mode**: Filename filter pattern (e.g., `*.txt`, `file?.doc`). Optional.
+  - **search mode**: Glob pattern for recursive search (e.g., `**/*.py`, `data*.json`). Required.
+</ParamField>
+
+<ParamField path="recursive" type="boolean" default={false}>
+  - **delete mode**: Set `true` to delete non-empty directories
+  - **list mode**: Set `true` to list subdirectories recursively
+  - **search mode**: Set `true` to search subdirectories (default behavior)
+</ParamField>
+
+<ParamField path="append" type="boolean" default={false}>
+  **write mode only**: Set `true` to append content to existing file instead of overwriting.
+</ParamField>
+
+<ParamField path="overwrite" type="boolean" default={false}>
+  **copy/move modes**: Set `true` to replace existing destination file or directory.
+</ParamField>
+
+<ParamField path="offset" type="integer">
+  **read mode only**: Starting line number (1-based). Use with `limit` to read specific sections of large files.
+</ParamField>
+
+<ParamField path="limit" type="integer">
+  **read mode only**: Number of lines to read from `offset`. Use to paginate through large files.
+</ParamField>
+
+<ParamField path="encoding" type="string" default="utf-8">
+  Text encoding for `read` and `write` modes. Common values: `utf-8`, `utf-16`, `ascii`, `latin-1`.
+</ParamField>
+
+<ParamField path="show_hidden" type="boolean" default={false}>
+  **list mode only**: Set `true` to include hidden files (names starting with `.`).
+</ParamField>
+
+## Mode Details
+
+### Read Mode
+
+Reads text file contents with optional line-based pagination.
+
+**Required Parameters:**
+- `path`: File to read
+
+**Optional Parameters:**
+- `offset`: Starting line number (1-based)
+- `limit`: Number of lines to read
+- `encoding`: Text encoding (default: `utf-8`)
+
+**Constraints:**
+- Maximum file size: 10 MB (10,485,760 bytes)
+- Binary files will return an encoding error
+
+**Examples:**
+
+Read entire file:
+```json
+{
+  "mode": "read",
+  "path": "notes.txt"
+}
+```
+
+Return:
+```
+File: C:\Users\User\Desktop\notes.txt
+This is line 1
+This is line 2
+```
+
+Read lines 10-20:
+```json
+{
+  "mode": "read",
+  "path": "large_file.log",
+  "offset": 10,
+  "limit": 10
+}
+```
+
+Return:
+```
+File: C:\Users\User\Desktop\large_file.log
+Lines 10-19 of 1523:
+[line 10 content]
+[line 11 content]
+...
+```
+
+Read with specific encoding:
+```json
+{
+  "mode": "read",
+  "path": "C:\\data\\european.txt",
+  "encoding": "latin-1"
+}
+```
+
+**Error Returns:**
+- `"Error: File not found: <path>"`
+- `"Error: Path is not a file: <path>"`
+- `"Error: File too large (15728640 bytes). Maximum is 10485760 bytes. Use offset/limit parameters or the Shell tool for large files."`
+- `"Error: Unable to read file as text with encoding \"utf-8\". File may be binary."`
+- `"Error: Permission denied: <path>"`
+
+---
+
+### Write Mode
+
+Creates or overwrites a file with text content. Can append to existing files.
+
+**Required Parameters:**
+- `path`: File to write
+- `content`: Text content to write
+
+**Optional Parameters:**
+- `append`: Set `true` to append instead of overwrite (default: `false`)
+- `encoding`: Text encoding (default: `utf-8`)
+
+**Behavior:**
+- Creates parent directories automatically if they don't exist
+- Overwrites existing file by default
+- With `append=true`, adds content to end of file
+
+**Examples:**
+
+Create new file:
+```json
+{
+  "mode": "write",
+  "path": "report.txt",
+  "content": "Project Status: Complete\n"
+}
+```
+
+Return:
+```
+Written to C:\Users\User\Desktop\report.txt (27 bytes)
+```
+
+Append to file:
+```json
+{
+  "mode": "write",
+  "path": "report.txt",
+  "content": "Date: 2024-03-15\n",
+  "append": true
+}
+```
+
+Return:
+```
+Appended to C:\Users\User\Desktop\report.txt (43 bytes)
+```
+
+Write to nested path:
+```json
+{
+  "mode": "write",
+  "path": "C:\\projects\\new_folder\\config.json",
+  "content": "{\"setting\": true}"
+}
+```
+
+**Error Returns:**
+- `"Error: Permission denied: <path>"`
+- `"Error writing file: <exception>"`
+
+---
+
+### Copy Mode
+
+Copies a file or directory to a new location.
+
+**Required Parameters:**
+- `path`: Source file or directory
+- `destination`: Destination path
+
+**Optional Parameters:**
+- `overwrite`: Set `true` to replace existing destination (default: `false`)
+
+**Behavior:**
+- Preserves file metadata (timestamps, attributes)
+- Creates parent directories for destination if needed
+- For directories, copies recursively with all contents
+- Fails if destination exists and `overwrite=false`
+
+**Examples:**
+
+Copy file:
+```json
+{
+  "mode": "copy",
+  "path": "document.txt",
+  "destination": "backup/document.txt"
+}
+```
+
+Return:
+```
+Copied file: C:\Users\User\Desktop\document.txt -> C:\Users\User\Desktop\backup\document.txt
+```
+
+Copy directory:
+```json
+{
+  "mode": "copy",
+  "path": "C:\\projects\\myapp",
+  "destination": "C:\\backup\\myapp",
+  "overwrite": true
+}
+```
+
+Return:
+```
+Copied directory: C:\projects\myapp -> C:\backup\myapp
+```
+
+**Error Returns:**
+- `"Error: Source not found: <path>"`
+- `"Error: Destination already exists: <path>. Set overwrite=True to replace."`
+- `"Error: Permission denied."`
+- `"Error copying: <exception>"`
+
+---
+
+### Move Mode
+
+Moves or renames a file or directory.
+
+**Required Parameters:**
+- `path`: Source file or directory
+- `destination`: Destination path
+
+**Optional Parameters:**
+- `overwrite`: Set `true` to replace existing destination (default: `false`)
+
+**Behavior:**
+- Works for both files and directories
+- Can rename (same directory) or move to different directory
+- Creates parent directories for destination if needed
+- Deletes destination first if it exists and `overwrite=true`
+- Atomic operation on same volume, copy+delete across volumes
+
+**Examples:**
+
+Rename file:
+```json
+{
+  "mode": "move",
+  "path": "old_name.txt",
+  "destination": "new_name.txt"
+}
+```
+
+Move file to different directory:
+```json
+{
+  "mode": "move",
+  "path": "document.txt",
+  "destination": "C:\\archive\\document.txt"
+}
+```
+
+Move and overwrite:
+```json
+{
+  "mode": "move",
+  "path": "report.txt",
+  "destination": "reports/report.txt",
+  "overwrite": true
+}
+```
+
+Return:
+```
+Moved: C:\Users\User\Desktop\report.txt -> C:\Users\User\Desktop\reports\report.txt
+```
+
+**Error Returns:**
+- `"Error: Source not found: <path>"`
+- `"Error: Destination already exists: <path>. Set overwrite=True to replace."`
+- `"Error: Permission denied."`
+- `"Error moving: <exception>"`
+
+---
+
+### Delete Mode
+
+Deletes a file or directory.
+
+**Required Parameters:**
+- `path`: File or directory to delete
+
+**Optional Parameters:**
+- `recursive`: Set `true` to delete non-empty directories (default: `false`)
+
+**Behavior:**
+- Files and empty directories can be deleted without `recursive`
+- Non-empty directories require `recursive=true`
+- Deletion is permanent (does not use Recycle Bin)
+- Handles symlinks safely (deletes link, not target)
+
+<Warning>
+  **Irreversible operation**: Deleted files cannot be recovered. They bypass the Recycle Bin.
+</Warning>
+
+**Examples:**
+
+Delete file:
+```json
+{
+  "mode": "delete",
+  "path": "temp.txt"
+}
+```
+
+Return:
+```
+Deleted file: C:\Users\User\Desktop\temp.txt
+```
+
+Delete empty directory:
+```json
+{
+  "mode": "delete",
+  "path": "empty_folder"
+}
+```
+
+Delete directory with contents:
+```json
+{
+  "mode": "delete",
+  "path": "old_project",
+  "recursive": true
+}
+```
+
+Return:
+```
+Deleted directory: C:\Users\User\Desktop\old_project
+```
+
+**Error Returns:**
+- `"Error: Path not found: <path>"`
+- `"Error: Directory is not empty: <path>. Set recursive=True to delete non-empty directories."`
+- `"Error: Permission denied: <path>"`
+- `"Error deleting: <exception>"`
+
+---
+
+### List Mode
+
+Lists the contents of a directory with optional filtering.
+
+**Required Parameters:**
+- `path`: Directory to list
+
+**Optional Parameters:**
+- `pattern`: Filename filter (e.g., `*.txt`, `data_?.csv`)
+- `recursive`: Set `true` to list subdirectories recursively (default: `false`)
+- `show_hidden`: Set `true` to include hidden files (default: `false`)
+
+**Behavior:**
+- Results sorted by type (directories first) then alphabetically
+- Shows file sizes in human-readable format (B, KB, MB, GB)
+- Truncates at 500 results (shows "... truncated" message)
+- Hidden files (starting with `.`) excluded by default
+- Pattern matching uses Unix shell-style wildcards
+
+**Output Format:**
+```
+  [DIR ] folder_name
+  [FILE] filename.txt  1.2 KB
+```
+
+**Examples:**
+
+List current directory:
+```json
+{
+  "mode": "list",
+  "path": "."
+}
+```
+
+Return:
+```
+Directory: C:\Users\User\Desktop
+  [DIR ] Documents
+  [DIR ] Projects
+  [FILE] notes.txt  342 B
+  [FILE] report.pdf  1.5 MB
+```
+
+List with filter:
+```json
+{
+  "mode": "list",
+  "path": "C:\\projects",
+  "pattern": "*.py"
+}
+```
+
+Return:
+```
+Directory: C:\projects (filter: *.py)
+  [FILE] main.py  2.1 KB
+  [FILE] utils.py  856 B
+```
+
+List recursively:
+```json
+{
+  "mode": "list",
+  "path": "Documents",
+  "recursive": true
+}
+```
+
+Return:
+```
+Directory: C:\Users\User\Desktop\Documents
+  [DIR ] Work
+  [DIR ] Work/Reports
+  [FILE] Work/Reports/Q1.pdf  2.3 MB
+  [FILE] notes.txt  128 B
+```
+
+**Error Returns:**
+- `"Error: Directory not found: <path>"`
+- `"Error: Path is not a directory: <path>"`
+- `"Directory <path> is empty."`
+- `"Error: Permission denied: <path>"`
+
+---
+
+### Search Mode
+
+Searches for files matching a glob pattern.
+
+**Required Parameters:**
+- `path`: Root directory to search
+- `pattern`: Glob pattern (e.g., `*.txt`, `**/*.py`, `data_*.json`)
+
+**Optional Parameters:**
+- `recursive`: Set `true` to search subdirectories (default: `true`)
+
+**Behavior:**
+- Uses glob pattern matching (wildcards: `*`, `?`, `**`)
+- `**` matches any number of directories
+- Results sorted alphabetically by name
+- Truncates at 500 results
+- Shows relative paths from search root
+
+**Glob Patterns:**
+- `*`: Matches any characters in a filename
+- `?`: Matches single character
+- `**`: Matches any number of directories (recursive)
+- `[abc]`: Matches one character from set
+- `{a,b}`: Matches either pattern
+
+**Examples:**
+
+Find all text files:
+```json
+{
+  "mode": "search",
+  "path": "C:\\projects",
+  "pattern": "*.txt"
+}
+```
+
+Return:
+```
+Search: "*.txt" in C:\projects (12 matches)
+  [FILE] notes.txt  1.2 KB
+  [FILE] data/readme.txt  534 B
+  [FILE] docs/guide.txt  8.9 KB
+  ...
+```
+
+Find Python files recursively:
+```json
+{
+  "mode": "search",
+  "path": "C:\\projects\\myapp",
+  "pattern": "**/*.py"
+}
+```
+
+Find files with pattern:
+```json
+{
+  "mode": "search",
+  "path": "C:\\data",
+  "pattern": "report_202?.json",
+  "recursive": false
+}
+```
+
+Return:
+```
+Search: "report_202?.json" in C:\data (4 matches)
+  [FILE] report_2020.json  14.2 KB
+  [FILE] report_2021.json  15.8 KB
+  [FILE] report_2022.json  18.1 KB
+  [FILE] report_2023.json  22.4 KB
+```
+
+**Error Returns:**
+- `"Error: Search path not found: <path>"`
+- `"Error: Search path is not a directory: <path>"`
+- `"No matches found for \"<pattern>\" in <path>"`
+- `"Error: Permission denied: <path>"`
+
+---
+
+### Info Mode
+
+Returns detailed metadata about a file or directory.
+
+**Required Parameters:**
+- `path`: File or directory to inspect
+
+**Behavior:**
+- Returns full metadata including size, dates, permissions
+- For directories, includes item count (files and subdirectories)
+- For files, includes extension
+- For symlinks, includes link target
+- Dates in `YYYY-MM-DD HH:MM:SS` format
+
+**Examples:**
+
+Get file info:
+```json
+{
+  "mode": "info",
+  "path": "document.txt"
+}
+```
+
+Return:
+```
+Path: C:\Users\User\Desktop\document.txt
+Type: File
+Size: 1.2 KB (1,247 bytes)
+Created: 2024-03-10 14:23:15
+Modified: 2024-03-15 09:42:03
+Accessed: 2024-03-15 10:15:22
+Read-only: False
+Extension: .txt
+```
+
+Get directory info:
+```json
+{
+  "mode": "info",
+  "path": "C:\\projects\\myapp"
+}
+```
+
+Return:
+```
+Path: C:\projects\myapp
+Type: Directory
+Size: 0 B (0 bytes)
+Created: 2024-01-05 08:00:00
+Modified: 2024-03-14 16:30:45
+Accessed: 2024-03-15 10:00:12
+Read-only: False
+Contents: 142 files, 23 directories
+```
+
+Get symlink info:
+```json
+{
+  "mode": "info",
+  "path": "shortcut"
+}
+```
+
+Return:
+```
+Path: C:\Users\User\Desktop\shortcut
+Type: Symlink
+Size: 0 B (0 bytes)
+Created: 2024-03-01 10:00:00
+Modified: 2024-03-01 10:00:00
+Accessed: 2024-03-15 09:00:00
+Read-only: False
+Link target: C:\\RealFolder\\Target
+```
+
+**Error Returns:**
+- `"Error: Path not found: <path>"`
+- `"Error: Permission denied: <path>"`
+- `"Error getting file info: <exception>"`
+
+## Implementation Details
+
+**Source Files:**
+- Tool definition: `src/windows_mcp/__main__.py:109-177`
+- Implementation: `src/windows_mcp/filesystem/service.py`
+- Data models: `src/windows_mcp/filesystem/views.py`
+
+**Key Functions:**
+- `read_file()`: Uses `pathlib.Path` with encoding support
+- `write_file()`: Creates parent dirs with `mkdir(parents=True)`
+- `copy_path()`: Uses `shutil.copy2()` for files, `shutil.copytree()` for dirs
+- `move_path()`: Uses `shutil.move()`
+- `delete_path()`: Uses `Path.unlink()` for files, `shutil.rmtree()` for dirs
+- `list_directory()`: Uses `Path.iterdir()` or `Path.rglob()`
+- `search_files()`: Uses `Path.glob()` or `Path.rglob()`
+- `get_file_info()`: Uses `Path.stat()` for metadata
+
+**Limits:**
+- Read mode: 10 MB max file size (`MAX_READ_SIZE`)
+- List/Search modes: 500 result limit (`MAX_RESULTS`)
+
+**Path Resolution:**
+- Relative paths resolved from user's Desktop folder (via `platformdirs.user_desktop_dir()`)
+- Absolute paths used as-is
+- Both `\\` and `/` separators supported
+
+## Error Handling
+
+All modes return user-friendly error messages as strings (not exceptions). Common error patterns:
+
+| Error Type | Example |
+|------------|----------|
+| Not found | `"Error: File not found: C:\\missing.txt"` |
+| Permission | `"Error: Permission denied: C:\\System32\\file.dll"` |
+| Wrong type | `"Error: Path is not a file: C:\\folder"` |
+| Constraint | `"Error: File too large (15728640 bytes). Maximum is 10485760 bytes..."` |
+| Missing param | `"Error: content parameter is required for write mode."` |
+| Already exists | `"Error: Destination already exists: C:\\file.txt. Set overwrite=True..."` |
+
+## Best Practices
+
+1. **Use absolute paths for clarity**: Especially when working outside the Desktop folder
+
+2. **Check with info mode first**: Before operations on unfamiliar paths
+
+3. **Use search for discovery**: When you don't know exact file locations
+
+4. **Paginate large files**: Use `offset` and `limit` for files approaching 10 MB
+
+5. **Set timeouts for PowerShell alternative**: For very large operations, PowerShell tool may be more appropriate
+
+6. **Double-check delete operations**: Deletions are permanent and bypass Recycle Bin
+
+7. **Test with list before delete**: Use list mode to preview what will be deleted
+
+## Related Tools
+
+- **[PowerShell](/api/shell)**: For advanced file operations, bulk processing, or files exceeding 10 MB
+- **[Scrape](/api/scrape)**: For downloading files from the web
+- **[Clipboard](/api/clipboard)**: For copying file paths or contents to clipboard

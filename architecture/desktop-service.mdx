@@ -1,0 +1,232 @@
+---
+title: "Desktop Service"
+description: "High-level orchestrator for window operations and UI interactions"
+---
+
+## Overview
+
+The Desktop Service (`desktop/service.py`) is the high-level orchestrator in Windows-MCP's architecture. It manages window operations, screenshots, mouse/keyboard actions, and clipboard operations while interfacing with the Tree Service for UI element discovery.
+
+## Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="Window Management" icon="window">
+    Launch, resize, switch, and enumerate windows
+  </Card>
+  <Card title="Screenshot Capture" icon="camera">
+    Capture desktop screenshots with optional annotations
+  </Card>
+  <Card title="Input Simulation" icon="keyboard">
+    Simulate mouse clicks, keyboard input, and shortcuts
+  </Card>
+  <Card title="UI Element Discovery" icon="magnifying-glass">
+    Interface with Tree Service to find interactive elements
+  </Card>
+</CardGroup>
+
+## Key Classes and Methods
+
+### Desktop Class
+
+The main `Desktop` class in `desktop/service.py` provides these key methods:
+
+<AccordionGroup>
+  <Accordion title="get_state()">
+    Captures the complete desktop state including windows, UI elements, and optional screenshot.
+    
+    **Parameters:**
+    - `use_vision: bool` - Include screenshot
+    - `use_dom: bool` - Extract browser DOM content
+    - `use_annotation: bool` - Draw bounding boxes on screenshot
+    - `use_ui_tree: bool` - Extract UI element tree
+    - `display_indices: list[int]` - Which displays to capture
+    - `max_image_size: Size` - Max screenshot dimensions
+    
+    **Returns:** `DesktopState` object containing windows, tree state, and screenshot
+  </Accordion>
+  
+  <Accordion title="app()">
+    Manages application windows with three modes:
+    - `launch` - Opens applications from Start menu
+    - `resize` - Adjusts window size/position
+    - `switch` - Brings window into focus
+  </Accordion>
+  
+  <Accordion title="click()">
+    Performs mouse clicks at coordinates.
+    
+    **Parameters:**
+    - `loc: list[int]` - [x, y] coordinates
+    - `button: str` - "left", "right", or "middle"
+    - `clicks: int` - 0=hover, 1=single, 2=double
+  </Accordion>
+  
+  <Accordion title="type()">
+    Simulates keyboard text entry.
+    
+    **Parameters:**
+    - `loc: list[int]` - Where to click before typing
+    - `text: str` - Text to type
+    - `caret_position: str` - "start", "end", or "idle"
+    - `clear: bool` - Clear existing text first
+  </Accordion>
+  
+  <Accordion title="execute_command()">
+    Executes PowerShell commands with timeout.
+    
+    **Returns:** Tuple of (output, status_code)
+  </Accordion>
+</AccordionGroup>
+
+## Data Models
+
+The `desktop/views.py` module defines core data models:
+
+### DesktopState
+
+```python
+@dataclass
+class DesktopState:
+    cursor_position: tuple[int, int]
+    windows: list[Window]
+    active_window: Window | None
+    tree_state: TreeState
+    screenshot: Image | None
+    screenshot_size: Size | None
+    screenshot_region: BoundingBox | None
+    screenshot_displays: list[int]
+```
+
+Contains the complete snapshot of desktop state returned by `get_state()`.
+
+### Window
+
+```python
+@dataclass
+class Window:
+    title: str
+    process_name: str
+    handle: int
+    bounding_box: BoundingBox
+    is_active: bool
+    desktop_id: int | None
+```
+
+Represents a single application window with position and metadata.
+
+### Size
+
+```python
+@dataclass
+class Size:
+    width: int
+    height: int
+```
+
+Dimensions for windows and screenshots.
+
+### BoundingBox
+
+```python
+@dataclass  
+class BoundingBox:
+    left: int
+    top: int
+    right: int
+    bottom: int
+```
+
+Rectangular region in screen coordinates.
+
+## Integration with Other Services
+
+<Steps>
+  <Step title="Tree Service">
+    Desktop Service calls `tree.get_tree_state()` to extract UI elements from windows
+  </Step>
+  <Step title="UIAutomation Wrapper">
+    Uses `uia` module for low-level COM API calls to interact with UI elements
+  </Step>
+  <Step title="Virtual Desktop Manager">
+    Queries `vdm` to determine which virtual desktop each window belongs to
+  </Step>
+  <Step title="Analytics">
+    Reports tool usage through the `@with_analytics` decorator in `__main__.py`
+  </Step>
+</Steps>
+
+## Screenshot Handling
+
+```python
+# From get_state() implementation
+screenshot = capture_screenshot(
+    display_indices=display_indices,
+    max_size=(1920, 1080)  # Capped for token efficiency
+)
+
+if use_annotation:
+    # Draw bounding boxes around UI elements
+    annotate_screenshot(screenshot, tree_state.interactive_elements)
+```
+
+<Info>
+Screenshots are capped at 1920x1080 to optimize token usage when sending to LLMs.
+</Info>
+
+## Mouse and Keyboard Input
+
+The Desktop Service uses the UIAutomation coordinate system for input:
+
+```python
+# Click uses UIA coordinates (same as BoundingRectangle)
+def click(self, loc: list[int], button: str, clicks: int):
+    x, y = loc
+    # No DPI scaling needed - UIA coordinates match screen coordinates
+    win32api.SetCursorPos((x, y))
+    # Perform click with mouse_event
+```
+
+<Warning>
+All coordinates use virtual desktop space, which spans multiple monitors. A coordinate of (2000, 500) may be on the second monitor if the first is 1920px wide.
+</Warning>
+
+## Configuration
+
+Desktop Service configuration is minimal and mostly uses defaults:
+
+```python
+# desktop/config.py
+MAX_IMAGE_WIDTH = 1920
+MAX_IMAGE_HEIGHT = 1080
+DEFAULT_SCREENSHOT_FORMAT = "PNG"
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Call get_state() First" icon="camera">
+    Before automation actions, capture desktop state to understand current UI
+  </Card>
+  <Card title="Use Label IDs" icon="tag">
+    Reference UI elements by label ID from TreeState instead of hardcoded coordinates
+  </Card>
+  <Card title="Handle Window Focus" icon="window-maximize">
+    Call `app(mode='switch')` to ensure correct window is focused before actions
+  </Card>
+  <Card title="Respect Timing" icon="clock">
+    Add appropriate waits after window operations for UI to stabilize
+  </Card>
+</CardGroup>
+
+## Source Files
+
+- **Service**: `src/windows_mcp/desktop/service.py`
+- **Data Models**: `src/windows_mcp/desktop/views.py`
+- **Configuration**: `src/windows_mcp/desktop/config.py`
+- **Utilities**: `src/windows_mcp/desktop/utils.py`
+
+## Related Architecture
+
+- [Tree Service](/architecture/tree-service) - UI element extraction
+- [UIAutomation Wrapper](/architecture/uia-wrapper) - Low-level COM API
+- [WatchDog](/architecture/watchdog) - UI focus change monitoring

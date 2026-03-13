@@ -1,0 +1,190 @@
+---
+title: "Move"
+description: "Move mouse cursor or perform drag-and-drop operations"
+---
+
+## Overview
+
+The Move tool moves the mouse cursor to specified coordinates or UI elements. Supports both simple hover movements and drag-and-drop operations.
+
+## Parameters
+
+<ParamField path="loc" type="list[int]" optional>
+  Target coordinates `[x, y]` to move the mouse to. Either `loc` or `label` must be provided.
+</ParamField>
+
+<ParamField path="label" type="int" optional>
+  Label ID of a UI element from Snapshot. Either `loc` or `label` must be provided.
+</ParamField>
+
+<ParamField path="drag" type="bool" default="false">
+  Perform a drag-and-drop operation:
+  - `false` - Simple cursor move (hover)
+  - `true` - Drag from current position to target location
+</ParamField>
+
+## Return Value
+
+Returns a success message indicating the action performed.
+
+Examples:
+- `"Moved the mouse pointer to (600,350)."`
+- `"Dragged to (800,500)."`
+
+## Examples
+
+### Move Mouse to Coordinates
+
+```json
+{
+  "loc": [600, 350],
+  "drag": false
+}
+```
+
+Moves the mouse cursor to (600, 350) without clicking.
+
+### Hover Over UI Element
+
+```json
+{
+  "label": 28,
+  "drag": false
+}
+```
+
+Moves the mouse to element 28 to trigger hover effects or tooltips.
+
+### Drag and Drop File
+
+```json
+{
+  "loc": [450, 600],
+  "drag": true
+}
+```
+
+Drags from the current mouse position to (450, 600) - useful for dragging files to folders.
+
+### Drag UI Element
+
+```json
+{
+  "label": 15,
+  "drag": true
+}
+```
+
+Drags from current position to element 15.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Hover Effects" icon="hand-pointer">
+    Trigger tooltips, previews, and hover-only UI elements
+  </Card>
+  <Card title="Drag and Drop" icon="up-down-left-right">
+    Move files, reorder list items, and drag UI elements
+  </Card>
+  <Card title="Precision Positioning" icon="crosshairs">
+    Position cursor precisely before complex click sequences
+  </Card>
+  <Card title="Selection" icon="object-group">
+    Drag to select multiple items or create selection rectangles
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Position before drag">
+    Use Move (without drag) or Click to position at the source location first
+  </Step>
+  <Step title="Use label IDs for targets">
+    Prefer `label` over hardcoded coordinates for drop targets
+  </Step>
+  <Step title="Add Wait between operations">
+    Use Wait tool after drag to allow the UI to process the drop
+  </Step>
+  <Step title="Verify with Snapshot">
+    Capture a Snapshot after drag-and-drop to confirm the operation succeeded
+  </Step>
+</Steps>
+
+<Warning>
+Drag operations hold the left mouse button down from the current position to the target. Ensure the mouse is positioned correctly before dragging.
+</Warning>
+
+## Drag-and-Drop Workflow Example
+
+<CodeGroup>
+
+```json Step 1: Click source
+{
+  "tool": "Click",
+  "loc": [200, 300],
+  "clicks": 1
+}
+```
+
+```json Step 2: Drag to destination
+{
+  "tool": "Move",
+  "loc": [500, 400],
+  "drag": true
+}
+```
+
+```json Step 3: Wait for UI update
+{
+  "tool": "Wait",
+  "duration": 1
+}
+```
+
+```json Step 4: Verify result
+{
+  "tool": "Snapshot",
+  "use_vision": false
+}
+```
+
+</CodeGroup>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Either loc or label must be provided">
+    You must specify either `loc` (coordinates) or `label` (element ID).
+  </Accordion>
+  <Accordion title="loc must be a list of exactly 2 integers [x, y]">
+    The `loc` parameter must be in `[x, y]` format with two numbers.
+  </Accordion>
+  <Accordion title="Desktop state is empty. Please call Snapshot first">
+    When using `label`, call Snapshot first to populate element information.
+  </Accordion>
+  <Accordion title="Failed to find element with label X">
+    The label ID is not in the current Snapshot. Refresh with a new Snapshot.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Details
+
+- **Movement speed**: Instant teleport to target coordinates (no animation)
+- **Drag behavior**: Holds left button down during drag, releases at target
+- **Coordinate system**: Uses virtual desktop coordinates (multi-monitor aware)
+- **Implementation**: Uses Windows SetCursorPos and mouse_event APIs
+
+<Info>
+Some applications detect "unnatural" instant mouse movements. If drag-and-drop fails, try breaking it into smaller movements.
+</Info>
+
+## Related Tools
+
+- [Click](/api/click) - Click at current mouse position or move and click in one operation
+- [Snapshot](/api/snapshot) - Get label IDs for drag targets
+- [MultiSelect](/api/multi-select) - Select multiple items with Ctrl+Click instead of dragging
+
+## Implementation
+
+Source: `src/windows_mcp/__main__.py:405-446`

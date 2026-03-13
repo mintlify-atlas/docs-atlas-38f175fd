@@ -1,0 +1,318 @@
+---
+title: "UIAutomation Wrapper"
+description: "Low-level abstraction over Windows UIAutomation COM API"
+---
+
+## Overview
+
+The UIAutomation Wrapper (`uia/`) provides a low-level Python abstraction over the Windows UIAutomation COM API via the `comtypes` library. It handles COM object lifetime, pattern wrapping, event subscriptions, and type conversions.
+
+## Module Structure
+
+<CardGroup cols={2}>
+  <Card title="core.py" icon="cube">
+    Main automation object and element wrappers
+  </Card>
+  <Card title="controls.py" icon="gamepad">
+    Control-specific logic for different UI element types
+  </Card>
+  <Card title="patterns.py" icon="puzzle-piece">
+    Wraps UIAutomation patterns (Invoke, Toggle, Value, etc.)
+  </Card>
+  <Card title="enums.py" icon="list">
+    COM enumerations and constants
+  </Card>
+  <Card title="events.py" icon="bell">
+    Event subscription and handler registration
+  </Card>
+</CardGroup>
+
+## Core Components
+
+### uia/core.py
+
+Provides the main `UIAutomation` class:
+
+```python
+class UIAutomation:
+    """Wrapper around IUIAutomation COM interface."""
+    
+    def __init__(self):
+        # Create COM automation object
+        self._automation = CreateObject(
+            "{ff48dba4-60ef-4201-aa87-54103eef594e}",  # CLSID_CUIAutomation
+            interface=IUIAutomation
+        )
+    
+    def get_root_element(self) -> Element:
+        """Get the root element (desktop)."""
+        return Element(self._automation.GetRootElement())
+    
+    def get_focused_element(self) -> Element:
+        """Get currently focused UI element."""
+        return Element(self._automation.GetFocusedElement())
+    
+    def element_from_handle(self, hwnd: int) -> Element:
+        """Get element from window handle."""
+        return Element(self._automation.ElementFromHandle(hwnd))
+```
+
+### Element Class
+
+Wraps `IUIAutomationElement` COM interface:
+
+```python
+class Element:
+    """Wrapper around IUIAutomationElement."""
+    
+    @property
+    def name(self) -> str:
+        """Element name (e.g., button text)."""
+        return self._element.CurrentName
+    
+    @property
+    def control_type(self) -> int:
+        """UIA control type ID."""
+        return self._element.CurrentControlType
+    
+    @property
+    def bounding_rectangle(self) -> tuple[int, int, int, int]:
+        """Element bounds in screen coordinates."""
+        rect = self._element.CurrentBoundingRectangle
+        return (rect.left, rect.top, rect.right, rect.bottom)
+    
+    def find_all(self, condition) -> list[Element]:
+        """Find all descendant elements matching condition."""
+        array = self._element.FindAll(TreeScope_Descendants, condition)
+        return [Element(array.GetElement(i)) for i in range(array.Length)]
+```
+
+## Control Types
+
+### uia/controls.py
+
+Provides control-specific helper methods:
+
+```python
+def is_button(element: Element) -> bool:
+    """Check if element is a button."""
+    return element.control_type == UIA_ButtonControlTypeId
+
+def is_edit(element: Element) -> bool:
+    """Check if element is a text input."""
+    return element.control_type == UIA_EditControlTypeId
+
+def get_control_type_name(control_type_id: int) -> str:
+    """Convert control type ID to name."""
+    mapping = {
+        UIA_ButtonControlTypeId: "Button",
+        UIA_EditControlTypeId: "Edit",
+        UIA_TextControlTypeId: "Text",
+        # ... more mappings
+    }
+    return mapping.get(control_type_id, "Unknown")
+```
+
+## UIAutomation Patterns
+
+### uia/patterns.py
+
+Wraps UIAutomation control patterns:
+
+<AccordionGroup>
+  <Accordion title="Invoke Pattern">
+    For clickable elements (buttons, links):
+    ```python
+    class InvokePattern:
+        def invoke(self):
+            """Programmatically click the element."""
+            self._pattern.Invoke()
+    ```
+  </Accordion>
+  
+  <Accordion title="Value Pattern">
+    For text input fields:
+    ```python
+    class ValuePattern:
+        def get_value(self) -> str:
+            return self._pattern.CurrentValue
+        
+        def set_value(self, value: str):
+            self._pattern.SetValue(value)
+    ```
+  </Accordion>
+  
+  <Accordion title="Toggle Pattern">
+    For checkboxes and toggles:
+    ```python
+    class TogglePattern:
+        def toggle(self):
+            self._pattern.Toggle()
+        
+        @property
+        def toggle_state(self) -> int:
+            return self._pattern.CurrentToggleState
+    ```
+  </Accordion>
+  
+  <Accordion title="Scroll Pattern">
+    For scrollable regions:
+    ```python
+    class ScrollPattern:
+        def scroll(self, horizontal: float, vertical: float):
+            """Scroll to percentage position."""
+            self._pattern.SetScrollPercent(horizontal, vertical)
+        
+        @property
+        def scroll_percent_vertical(self) -> float:
+            return self._pattern.CurrentVerticalScrollPercent
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Event Handling
+
+### uia/events.py
+
+Manages UIAutomation event subscriptions:
+
+```python
+class EventHandler(IUIAutomationFocusChangedEventHandler):
+    """Handler for focus change events."""
+    
+    def __init__(self, callback):
+        self._callback = callback
+    
+    def HandleFocusChangedEvent(self, sender):
+        """Called when focus changes."""
+        element = Element(sender)
+        self._callback(element)
+
+def subscribe_focus_changed(automation: UIAutomation, callback):
+    """Subscribe to focus change events."""
+    handler = EventHandler(callback)
+    automation._automation.AddFocusChangedEventHandler(None, handler)
+    return handler
+```
+
+<Info>
+The WatchDog service uses event subscriptions to monitor focus changes and invalidate cached UI trees.
+</Info>
+
+## Enumerations
+
+### uia/enums.py
+
+Defines COM constants and enumerations:
+
+```python
+# Control Type IDs
+UIA_ButtonControlTypeId = 50000
+UIA_EditControlTypeId = 50004
+UIA_TextControlTypeId = 50020
+UIA_MenuItemControlTypeId = 50011
+# ... more control types
+
+# Tree Scopes
+TreeScope_Element = 0x1
+TreeScope_Children = 0x2
+TreeScope_Descendants = 0x4
+TreeScope_Subtree = 0x7
+
+# Pattern IDs
+UIA_InvokePatternId = 10000
+UIA_ValuePatternId = 10002
+UIA_ScrollPatternId = 10003
+# ... more patterns
+```
+
+## COM Object Lifetime
+
+The wrapper handles COM object cleanup:
+
+```python
+class Element:
+    def __init__(self, com_element):
+        self._element = com_element
+        # COM object ref count increased
+    
+    def __del__(self):
+        # Release COM reference on garbage collection
+        self._element = None
+```
+
+<Warning>
+Improper COM object lifetime management can cause memory leaks or access violations. The wrapper ensures proper cleanup.
+</Warning>
+
+## Error Handling
+
+COM operations can fail. The wrapper converts COM errors to Python exceptions:
+
+```python
+from comtypes import COMError
+
+def safe_get_property(element, property_name):
+    try:
+        return getattr(element._element, property_name)
+    except COMError as e:
+        if e.hresult == -2147220991:  # Element not available
+            return None
+        raise
+```
+
+## Coordinate Systems
+
+UIAutomation uses screen coordinates:
+
+```python
+# All coordinates are in virtual desktop space
+# Multi-monitor setups use a single coordinate system
+# Example: (2000, 100) may be on the second monitor
+
+element.bounding_rectangle  # Returns (left, top, right, bottom) in screen pixels
+```
+
+<Tip>
+UIAutomation coordinates match screen coordinates exactly - no DPI scaling needed. This is why Windows-MCP input is reliable across different display settings.
+</Tip>
+
+## Performance Considerations
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| Get root element | ~1ms | Cached by Windows |
+| Find all children | ~10-50ms | Depends on element count |
+| Get element property | ~0.1ms | Direct COM call |
+| Subscribe to event | ~5ms | One-time setup cost |
+
+## Best Practices
+
+<Steps>
+  <Step title="Cache element references">
+    Don't repeatedly query the same element - cache the Element object
+  </Step>
+  <Step title="Use patterns when available">
+    Prefer Invoke pattern over simulating clicks for better reliability
+  </Step>
+  <Step title="Handle COM errors">
+    UI elements can disappear - wrap property access in try/except
+  </Step>
+  <Step title="Release references promptly">
+    Set element variables to None when done to release COM objects
+  </Step>
+</Steps>
+
+## Source Files
+
+- **Core**: `src/windows_mcp/uia/core.py`
+- **Controls**: `src/windows_mcp/uia/controls.py`
+- **Patterns**: `src/windows_mcp/uia/patterns.py`
+- **Enumerations**: `src/windows_mcp/uia/enums.py`
+- **Events**: `src/windows_mcp/uia/events.py`
+
+## Related Architecture
+
+- [Tree Service](/architecture/tree-service) - Uses UIAutomation wrapper for tree traversal
+- [Desktop Service](/architecture/desktop-service) - Uses wrapper for input simulation
+- [WatchDog](/architecture/watchdog) - Uses event subscriptions for focus monitoring

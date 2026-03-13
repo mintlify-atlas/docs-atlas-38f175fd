@@ -1,97 +1,86 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Windows-MCP"
+description: "MCP Server for Computer Use in Windows - enabling AI agents to interact seamlessly with the Windows operating system"
 ---
 
-## Setting up
+## Welcome to Windows-MCP
 
-Get your documentation site up and running in minutes.
+Windows-MCP is a lightweight, open-source MCP (Model Context Protocol) server that bridges AI agents and the Windows operating system. It enables LLMs to perform desktop automation tasks such as file navigation, application control, UI interaction, and QA testing through 15 powerful tools.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes with PyPI or source installation
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Complete setup instructions for Claude Desktop, Perplexity, and more
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Tools Overview" icon="wrench" href="/concepts/tools-overview">
+    Explore all 15 automation tools available in Windows-MCP
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/snapshot">
+    Detailed documentation for every MCP tool and parameter
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Seamless Windows Integration" icon="windows">
+    Interacts natively with Windows UI elements, opens apps, controls windows, and simulates user input
+  </Card>
+  <Card title="Works with Any LLM" icon="brain">
+    No computer vision or fine-tuned models required - reducing complexity and setup time
+  </Card>
+  <Card title="15 Powerful Tools" icon="tools">
+    Complete toolset for keyboard, mouse, window management, and system operations
+  </Card>
+  <Card title="Real-Time Performance" icon="bolt">
+    0.2-0.9 second latency between actions depending on system load
+  </Card>
+  <Card title="DOM Mode for Browsers" icon="browser">
+    Special mode for web automation that filters browser UI for cleaner interaction
+  </Card>
+  <Card title="Local & Remote Modes" icon="server">
+    Run directly on Windows or connect to cloud-hosted Windows VMs
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Getting Started
 
-## Need inspiration?
+<Steps>
+  <Step title="Install Prerequisites">
+    Ensure you have Python 3.13+ and UV package manager installed on your Windows system
+  </Step>
+  <Step title="Install Windows-MCP">
+    Use `uvx windows-mcp` for quick PyPI installation or clone from source
+  </Step>
+  <Step title="Configure Your MCP Client">
+    Add Windows-MCP to Claude Desktop, Perplexity, Gemini CLI, or other MCP clients
+  </Step>
+  <Step title="Start Automating">
+    Begin using the 15 tools to automate Windows desktop tasks
+  </Step>
+</Steps>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Supported Operating Systems
+
+Windows-MCP supports all modern Windows versions:
+
+- Windows 7
+- Windows 8, 8.1
+- Windows 10
+- Windows 11
+
+## Community & Support
+
+<CardGroup cols={3}>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/CursorTouch/Windows-MCP">
+    Star the project and view source code
+  </Card>
+  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/Aue9Yj2VzS">
+    Join our active community for support
+  </Card>
+  <Card title="Follow on Twitter" icon="twitter" href="https://x.com/CursorTouch">
+    Stay updated with latest news
+  </Card>
+</CardGroup>

@@ -1,0 +1,215 @@
+---
+title: 'MultiSelect'
+description: 'Select multiple items, files, folders, or checkboxes'
+icon: 'square-check'
+---
+
+## Overview
+
+The **MultiSelect** tool performs selection operations on multiple UI elements simultaneously. It can select multiple files/folders in File Explorer, check multiple checkboxes, or perform rapid sequential clicks across different locations.
+
+<Info>
+**Use Cases:** Multi-file operations, bulk checkbox selection, batch item selection
+</Info>
+
+## Parameters
+
+<ParamField path="locs" type="list[list[int]]">
+  List of coordinate pairs `[[x1, y1], [x2, y2], ...]` where each click should occur.
+  
+  Either `locs` or `labels` must be provided (not both).
+  
+  ```python
+  locs=[[100, 200], [150, 250], [200, 300]]
+  ```
+</ParamField>
+
+<ParamField path="labels" type="list[int]">
+  List of UI element labels/IDs from a previous **Snapshot** call. The tool will automatically resolve each label to its coordinates.
+  
+  Either `locs` or `labels` must be provided (not both).
+  
+  <Warning>
+  Requires a recent **Snapshot** call. The desktop state must be populated before using labels.
+  </Warning>
+  
+  ```python
+  labels=[42, 43, 44]
+  ```
+</ParamField>
+
+<ParamField path="press_ctrl" type="boolean" default="true">
+  Controls the selection behavior:
+  - `true`: Holds Ctrl key while clicking, adding items to selection (multi-select mode)
+  - `false`: Performs individual clicks without Ctrl (sequential clicks mode)
+  
+  ```python
+  press_ctrl=True  # Hold Ctrl for multi-select
+  ```
+</ParamField>
+
+## Return Value
+
+Returns a string listing all selected element coordinates:
+
+```
+Multi-selected elements at:
+(x1,y1)
+(x2,y2)
+(x3,y3)
+```
+
+## Examples
+
+### Select Multiple Files by Coordinates
+
+```python
+# Select three files in File Explorer
+result = multi_select_tool(
+    locs=[[300, 200], [300, 250], [300, 300]],
+    press_ctrl=True
+)
+# Returns: "Multi-selected elements at:\n(300,200)\n(300,250)\n(300,300)"
+```
+
+### Select Multiple Checkboxes by Labels
+
+```python
+# First, take a snapshot to get labels
+state_tool()
+
+# Select checkboxes using their labels
+result = multi_select_tool(
+    labels=[15, 16, 17, 18],
+    press_ctrl=True
+)
+# Returns: Coordinates of all selected checkboxes
+```
+
+### Sequential Clicks Without Multi-Select
+
+```python
+# Perform individual clicks without holding Ctrl
+result = multi_select_tool(
+    locs=[[100, 100], [200, 200], [300, 300]],
+    press_ctrl=False
+)
+# Each location clicked individually without multi-selection
+```
+
+### Select Files in Different Folders
+
+```python
+# After navigating to a folder with Snapshot
+result = multi_select_tool(
+    labels=[10, 11, 12, 13, 14],  # File labels from Snapshot
+    press_ctrl=True
+)
+# Selects all 5 files simultaneously
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="File Operations" icon="folder">
+    Select multiple files/folders for copy, move, or delete operations.
+  </Card>
+  <Card title="Form Filling" icon="square-check">
+    Check or uncheck multiple checkboxes in forms or settings dialogs.
+  </Card>
+  <Card title="Batch Processing" icon="layer-group">
+    Select multiple items in lists, galleries, or data grids for batch operations.
+  </Card>
+  <Card title="Multi-Object Selection" icon="hand-pointer">
+    Select multiple objects in design tools, editors, or applications.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Either locs or labels must be provided">
+    **Error:** `ValueError: Either locs or labels must be provided.`
+    
+    **Cause:** Neither `locs` nor `labels` parameter was provided.
+    
+    **Solution:** Provide either a list of coordinates (`locs`) or a list of element labels (`labels`).
+  </Accordion>
+  
+  <Accordion title="Desktop state is empty">
+    **Error:** `ValueError: Desktop state is empty. Please call Snapshot first.`
+    
+    **Cause:** Using `labels` parameter without a recent **Snapshot** call.
+    
+    **Solution:** Call `state_tool()` (Snapshot) before using labels to populate the desktop state.
+  </Accordion>
+  
+  <Accordion title="Failed to find element with label">
+    **Error:** `ValueError: Failed to find element with label {label}: ...`
+    
+    **Cause:** The specified label doesn't exist in the current desktop state.
+    
+    **Solution:** Take a fresh snapshot and verify the label numbers. The UI may have changed.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Take a Fresh Snapshot">
+    When using `labels`, call **Snapshot** immediately before to ensure accurate element positions.
+  </Step>
+  
+  <Step title="Use Labels for Dynamic UIs">
+    Prefer `labels` over `locs` when UI elements may move or resize. Labels automatically resolve to current positions.
+  </Step>
+  
+  <Step title="Keep press_ctrl=True for Selection">
+    Use the default `press_ctrl=True` when selecting multiple items. Use `press_ctrl=False` only when you need sequential individual clicks.
+  </Step>
+  
+  <Step title="Verify Selection Context">
+    Ensure the correct window is focused before multi-selecting. Use **App** tool with `mode='switch'` if needed.
+  </Step>
+  
+  <Step title="Combine with Other Tools">
+    Chain MultiSelect with **Shortcut** (Ctrl+C, Ctrl+X) or context menus for complete file operations.
+  </Step>
+</Steps>
+
+## Technical Details
+
+### Implementation
+
+1. **Coordinate Resolution**: If `labels` provided, each label is resolved to `[x, y]` coordinates using the current desktop state
+2. **Ctrl Key Handling**: When `press_ctrl=True`, the Ctrl key is pressed and held before all clicks
+3. **Click Sequence**: Each location receives a left-click in sequence
+4. **Ctrl Key Release**: After all clicks, the Ctrl key is released
+
+### Timing
+- Small delays between clicks ensure proper registration
+- No wait between resolving labels (fast batch operation)
+
+### Coordinate System
+- Uses virtual desktop coordinates (same as **Snapshot**)
+- Coordinates are absolute screen positions
+- Multi-monitor setups supported
+
+## Comparison: locs vs labels
+
+| Aspect | locs | labels |
+|--------|------|--------|
+| **Setup Required** | None | Requires Snapshot call |
+| **Accuracy** | Fixed coordinates | Adapts to UI changes |
+| **Performance** | Faster (direct) | Slight overhead (lookup) |
+| **Best For** | Static UIs, known positions | Dynamic UIs, flexible scripts |
+| **Error Prone** | Yes (if UI changes) | No (auto-resolves) |
+
+## Related Tools
+
+- [**Click**](/api/click) - Single click operations
+- [**MultiEdit**](/api/multi-edit) - Enter text in multiple fields
+- [**Snapshot**](/api/snapshot) - Get UI element labels
+- [**Shortcut**](/api/shortcut) - Keyboard shortcuts (Ctrl+A for select all)

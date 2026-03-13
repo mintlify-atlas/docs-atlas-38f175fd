@@ -1,0 +1,773 @@
+---
+title: 'Advanced Usage'
+description: 'Advanced tools and techniques for complex automation workflows'
+icon: 'wand-magic-sparkles'
+---
+
+## Overview
+
+Beyond basic automation, Windows-MCP provides advanced tools for bulk operations, system configuration, and user notifications. These tools enable sophisticated automation workflows that combine multiple operations for maximum efficiency.
+
+**Advanced tools covered:**
+- **MultiSelect**: Select multiple items simultaneously
+- **MultiEdit**: Fill multiple form fields at once
+- **Registry**: Read and modify Windows Registry
+- **Notification**: Send Windows toast notifications
+- **Combined workflows**: Orchestrating complex automation tasks
+
+## MultiSelect Tool
+
+Select multiple items (files, folders, checkboxes) in a single operation.
+
+### Basic Multi-Selection
+
+```python
+# Select multiple files with Ctrl+Click
+MultiSelect(
+    locs=[
+        [100, 200],  # First file
+        [100, 250],  # Second file
+        [100, 300]   # Third file
+    ],
+    press_ctrl=True  # Hold Ctrl during clicks
+)
+```
+
+### Using Element Labels
+
+```python
+# First capture desktop state
+snapshot = Snapshot(use_vision=True)
+
+# Then select using labels from snapshot
+MultiSelect(
+    labels=[5, 7, 9],  # Element labels from snapshot
+    press_ctrl=True
+)
+```
+
+### Multiple Clicks Without Ctrl
+
+```python
+# Perform multiple independent clicks
+MultiSelect(
+    locs=[
+        [500, 300],
+        [600, 400],
+        [700, 500]
+    ],
+    press_ctrl=False  # No Ctrl key
+)
+```
+
+### Complete File Selection Example
+
+<Steps>
+  <Step title="Open File Explorer">
+    ```python
+    App(mode='launch', name='explorer')
+    Wait(duration=2)
+    ```
+  </Step>
+
+  <Step title="Navigate to folder">
+    ```python
+    Type(loc=[500, 50], text='C:\\Documents', press_enter=True)
+    Wait(duration=2)
+    ```
+  </Step>
+
+  <Step title="Capture file locations">
+    ```python
+    snapshot = Snapshot(use_vision=True, use_annotation=True)
+    # Agent identifies file element labels: 10, 12, 14
+    ```
+  </Step>
+
+  <Step title="Select multiple files">
+    ```python
+    MultiSelect(
+        labels=[10, 12, 14],
+        press_ctrl=True
+    )
+    ```
+  </Step>
+
+  <Step title="Perform action on selection">
+    ```python
+    # Copy selected files
+    Shortcut('ctrl+c')
+    
+    # Or delete them
+    Shortcut('delete')
+    ```
+  </Step>
+</Steps>
+
+## MultiEdit Tool
+
+Enter text into multiple input fields efficiently.
+
+### Basic Multi-Field Editing
+
+```python
+# Fill multiple fields using coordinates
+MultiEdit(
+    locs=[
+        [300, 200, 'John Doe'],        # Name field
+        [300, 250, 'john@example.com'], # Email field
+        [300, 300, '+1-555-0123']      # Phone field
+    ]
+)
+```
+
+### Using Element Labels
+
+```python
+# First capture form state
+snapshot = Snapshot(use_dom=True, use_vision=True)
+
+# Then fill using labels
+MultiEdit(
+    labels=[
+        [5, 'John Doe'],              # Name field (label 5)
+        [7, 'john@example.com'],      # Email field (label 7)
+        [9, 'Company Inc.']           # Company field (label 9)
+    ]
+)
+```
+
+### Complete Form Filling Example
+
+<Steps>
+  <Step title="Open form page">
+    ```python
+    App(mode='launch', name='chrome')
+    Wait(duration=2)
+    Type(loc=[500, 50], text='https://example.com/signup', press_enter=True)
+    Wait(duration=3)
+    ```
+  </Step>
+
+  <Step title="Capture form with DOM mode">
+    ```python
+    snapshot = Snapshot(use_dom=True, use_vision=True)
+    # Agent identifies input field labels
+    ```
+  </Step>
+
+  <Step title="Fill all fields at once">
+    ```python
+    MultiEdit(
+        labels=[
+            [10, 'John'],
+            [12, 'Doe'],
+            [14, 'john.doe@example.com'],
+            [16, 'SecurePass123'],
+            [18, 'SecurePass123'],  # Confirm password
+            [20, 'Company Inc.'],
+            [22, '+1-555-0123']
+        ]
+    )
+    ```
+  </Step>
+
+  <Step title="Submit form">
+    ```python
+    Click(label=25, button='left', clicks=1)  # Submit button
+    Wait(duration=2)
+    ```
+  </Step>
+</Steps>
+
+## Registry Tool
+
+Read and modify Windows Registry for system configuration.
+
+<Warning>
+**Registry modifications can affect system stability.** Only modify Registry keys you understand. Always backup before making changes.
+</Warning>
+
+### Reading Registry Values
+
+```python
+# Read a specific registry value
+Registry(
+    mode='get',
+    path='HKCU:\\Software\\MyApp',
+    name='Version'
+)
+```
+
+**Returns:** `Registry value [HKCU:\Software\MyApp] "Version" = 1.2.3`
+
+### Writing Registry Values
+
+```python
+# Set a string value
+Registry(
+    mode='set',
+    path='HKCU:\\Software\\MyApp',
+    name='ApiKey',
+    value='abc123xyz',
+    type='String'  # Default: 'String'
+)
+```
+
+### Registry Value Types
+
+<Tabs>
+  <Tab title="String">
+    ```python
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='Username',
+        value='john_doe',
+        type='String'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="DWord (32-bit integer)">
+    ```python
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='Port',
+        value='8080',
+        type='DWord'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="QWord (64-bit integer)">
+    ```python
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='LargeValue',
+        value='9223372036854775807',
+        type='QWord'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Binary">
+    ```python
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='BinaryData',
+        value='48656C6C6F',  # Hex string
+        type='Binary'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="MultiString">
+    ```python
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='Servers',
+        value='server1,server2,server3',
+        type='MultiString'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="ExpandString">
+    ```python
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='InstallPath',
+        value='%PROGRAMFILES%\\MyApp',
+        type='ExpandString'
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Listing Registry Contents
+
+```python
+# List all values and sub-keys
+Registry(
+    mode='list',
+    path='HKCU:\\Software\\MyApp'
+)
+```
+
+**Returns:**
+```
+Values:
+Version : 1.2.3
+ApiKey : abc123xyz
+Port : 8080
+
+Sub-Keys:
+Settings
+Cache
+```
+
+### Deleting Registry Entries
+
+```python
+# Delete a specific value
+Registry(
+    mode='delete',
+    path='HKCU:\\Software\\MyApp',
+    name='OldSetting'
+)
+
+# Delete entire key and all sub-keys
+Registry(
+    mode='delete',
+    path='HKCU:\\Software\\MyApp\\OldVersion'
+)
+```
+
+### Registry Path Format
+
+Windows-MCP uses PowerShell registry path format:
+
+**Common root keys:**
+- `HKCU:\\` - HKEY_CURRENT_USER
+- `HKLM:\\` - HKEY_LOCAL_MACHINE
+- `HKCR:\\` - HKEY_CLASSES_ROOT
+- `HKU:\\` - HKEY_USERS
+- `HKCC:\\` - HKEY_CURRENT_CONFIG
+
+**Examples:**
+```python
+'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion'
+'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run'
+'HKCU:\\Environment'
+```
+
+## Notification Tool
+
+Send Windows toast notifications to alert users.
+
+### Basic Notification
+
+```python
+# Send simple notification
+Notification(
+    title='Task Complete',
+    message='File backup has finished successfully'
+)
+```
+
+### Notification in Workflows
+
+```python
+# Alert when long operation completes
+Notification(
+    title='Export Ready',
+    message='Your data export is ready in the Downloads folder'
+)
+
+# Alert on errors
+Notification(
+    title='Error Occurred',
+    message='Failed to connect to server. Please check your network.'
+)
+
+# Progress notifications
+Notification(
+    title='Processing',
+    message='Processed 50 of 100 files...'
+)
+```
+
+### Notification Best Practices
+
+<Tip>
+**Keep messages concise:** Notifications disappear quickly. Keep title under 40 characters, message under 100 characters.
+</Tip>
+
+<Tip>
+**Use meaningful titles:** Titles should immediately convey the notification type (success, error, progress).
+</Tip>
+
+## Complex Workflow Examples
+
+### Example 1: Automated Data Collection
+
+<Steps>
+  <Step title="Open application and login">
+    ```python
+    App(mode='launch', name='DataApp')
+    Wait(duration=3)
+    
+    # Login form
+    snapshot = Snapshot(use_vision=True)
+    MultiEdit(
+        labels=[
+            [5, 'username'],
+            [7, 'password']
+        ]
+    )
+    Click(label=9, button='left', clicks=1)  # Login button
+    Wait(duration=3)
+    ```
+  </Step>
+
+  <Step title="Export data from multiple sections">
+    ```python
+    # Navigate to reports section
+    Click(label=15, button='left', clicks=1)
+    Wait(duration=2)
+    
+    # Select multiple reports
+    MultiSelect(
+        labels=[20, 22, 24, 26],
+        press_ctrl=True
+    )
+    
+    # Export selected
+    Click(label=30, button='left', clicks=1)  # Export button
+    Wait(duration=5)
+    ```
+  </Step>
+
+  <Step title="Save and organize exports">
+    ```python
+    # Save dialog appears
+    Type(loc=[500, 300], text='C:\\Reports\\export_2024', press_enter=True)
+    Wait(duration=3)
+    
+    # Organize files
+    FileSystem(
+        mode='list',
+        path='C:/Reports/export_2024'
+    )
+    ```
+  </Step>
+
+  <Step title="Notify completion">
+    ```python
+    Notification(
+        title='Data Export Complete',
+        message='All reports exported to C:\\Reports\\export_2024'
+    )
+    ```
+  </Step>
+</Steps>
+
+### Example 2: System Configuration Backup
+
+```python
+# Backup critical registry settings
+registry_backup = []
+
+# Read multiple registry values
+keys_to_backup = [
+    ('HKCU:\\Software\\MyApp', 'Version'),
+    ('HKCU:\\Software\\MyApp', 'ApiKey'),
+    ('HKCU:\\Software\\MyApp', 'DatabasePath')
+]
+
+for path, name in keys_to_backup:
+    value = Registry(mode='get', path=path, name=name)
+    registry_backup.append(value)
+
+# Save backup to file
+backup_content = '\n'.join(registry_backup)
+FileSystem(
+    mode='write',
+    path='C:/Backups/registry_backup.txt',
+    content=backup_content
+)
+
+# Notify user
+Notification(
+    title='Backup Complete',
+    message='Registry settings backed up to C:\\Backups'
+)
+```
+
+### Example 3: Batch File Processing
+
+```python
+# Find all images
+images = FileSystem(
+    mode='search',
+    path='C:/Pictures',
+    pattern='*.{jpg,png}',
+    recursive=True
+)
+
+# Open image editor
+App(mode='launch', name='Paint.NET')
+Wait(duration=3)
+
+# Process each image (example for 3 images)
+image_paths = [
+    'C:/Pictures/img1.jpg',
+    'C:/Pictures/img2.jpg',
+    'C:/Pictures/img3.jpg'
+]
+
+for i, img_path in enumerate(image_paths):
+    # Open image
+    Shortcut('ctrl+o')
+    Wait(duration=1)
+    Type(loc=[500, 400], text=img_path, press_enter=True)
+    Wait(duration=2)
+    
+    # Apply filter (example: resize)
+    Shortcut('ctrl+r')
+    Wait(duration=1)
+    MultiEdit(
+        locs=[
+            [300, 200, '800'],   # Width
+            [300, 250, '600']    # Height
+        ]
+    )
+    Click(label=15, button='left', clicks=1)  # OK button
+    Wait(duration=1)
+    
+    # Save
+    Shortcut('ctrl+s')
+    Wait(duration=1)
+    
+    # Progress notification
+    if (i + 1) % 10 == 0:
+        Notification(
+            title='Processing Images',
+            message=f'Processed {i + 1} of {len(image_paths)} images'
+        )
+
+# Final notification
+Notification(
+    title='Batch Processing Complete',
+    message=f'Processed {len(image_paths)} images successfully'
+)
+```
+
+### Example 4: Application Setup Automation
+
+```python
+# Install and configure application
+App(mode='launch', name='installer')
+Wait(duration=5)
+
+# Installation wizard
+for step in range(5):
+    snapshot = Snapshot(use_vision=True)
+    
+    # Click Next/Install/Accept buttons
+    # (agent identifies button by context)
+    Click(label=10, button='left', clicks=1)
+    Wait(duration=2)
+
+Wait(duration=10)  # Wait for installation
+
+# Configure application via registry
+Registry(
+    mode='set',
+    path='HKCU:\\Software\\NewApp',
+    name='FirstRun',
+    value='0',
+    type='DWord'
+)
+
+Registry(
+    mode='set',
+    path='HKCU:\\Software\\NewApp',
+    name='Theme',
+    value='Dark',
+    type='String'
+)
+
+# Copy configuration file
+FileSystem(
+    mode='copy',
+    path='C:/Templates/app_config.json',
+    destination='C:/Users/Default/AppData/Local/NewApp/config.json'
+)
+
+# Launch configured application
+App(mode='launch', name='NewApp')
+Wait(duration=3)
+
+Notification(
+    title='Setup Complete',
+    message='NewApp installed and configured successfully'
+)
+```
+
+## Combining Tools for Maximum Efficiency
+
+<CardGroup cols={2}>
+  <Card title="Bulk Operations" icon="layer-group">
+    Use MultiSelect + Clipboard for fast bulk operations:
+    
+    ```python
+    # Select multiple files
+    MultiSelect(labels=[5, 7, 9], press_ctrl=True)
+    
+    # Copy selection
+    Shortcut('ctrl+c')
+    
+    # Paste elsewhere
+    App(mode='switch', name='Explorer')
+    Shortcut('ctrl+v')
+    ```
+  </Card>
+
+  <Card title="Configuration + Notification" icon="bell">
+    Update settings and alert user:
+    
+    ```python
+    # Update multiple registry keys
+    for setting in settings_list:
+        Registry(
+            mode='set',
+            path=setting['path'],
+            name=setting['name'],
+            value=setting['value']
+        )
+    
+    # Notify user
+    Notification(
+        title='Settings Updated',
+        message='Configuration changes applied'
+    )
+    ```
+  </Card>
+
+  <Card title="Form Filling + Validation" icon="clipboard-check">
+    Fill forms and verify:
+    
+    ```python
+    # Fill form
+    MultiEdit(labels=[[5, 'data1'], [7, 'data2']])
+    
+    # Capture result
+    snapshot = Snapshot(use_dom=True)
+    
+    # Verify and submit
+    Click(label=10, button='left', clicks=1)
+    ```
+  </Card>
+
+  <Card title="Process + Notification" icon="list-check">
+    Monitor and alert:
+    
+    ```python
+    # Check resource usage
+    processes = Process(
+        mode='list',
+        sort_by='memory',
+        limit=5
+    )
+    
+    # Alert if high usage
+    Notification(
+        title='Resource Alert',
+        message='High memory usage detected'
+    )
+    ```
+  </Card>
+</CardGroup>
+
+## Best Practices for Advanced Workflows
+
+<AccordionGroup>
+  <Accordion title="Error handling and recovery">
+    Always include error checks and fallback options:
+    
+    ```python
+    # Attempt operation
+    result = FileSystem(mode='copy', path='source.txt', destination='dest.txt')
+    
+    # Check for errors
+    if 'Error' in result:
+        # Try alternative
+        FileSystem(mode='copy', path='backup.txt', destination='dest.txt')
+        
+        # Notify user
+        Notification(
+            title='Warning',
+            message='Used backup file instead of original'
+        )
+    ```
+  </Accordion>
+
+  <Accordion title="Progress tracking">
+    Use notifications for long-running operations:
+    
+    ```python
+    total_items = 100
+    
+    for i in range(total_items):
+        # Process item...
+        
+        # Send progress notification every 25%
+        if (i + 1) % 25 == 0:
+            Notification(
+                title='Progress Update',
+                message=f'{i + 1}/{total_items} items processed'
+            )
+    ```
+  </Accordion>
+
+  <Accordion title="Registry safety">
+    Always backup before modifying registry:
+    
+    ```python
+    # Backup current value
+    old_value = Registry(
+        mode='get',
+        path='HKCU:\\Software\\MyApp',
+        name='Setting'
+    )
+    
+    # Save backup
+    FileSystem(
+        mode='write',
+        path='registry_backup.txt',
+        content=old_value,
+        append=True
+    )
+    
+    # Apply new value
+    Registry(
+        mode='set',
+        path='HKCU:\\Software\\MyApp',
+        name='Setting',
+        value='new_value'
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Validation before bulk operations">
+    Verify before executing bulk changes:
+    
+    ```python
+    # Preview what will be affected
+    files_to_process = FileSystem(
+        mode='search',
+        path='C:/Data',
+        pattern='*.txt'
+    )
+    
+    # Show count to user (via notification or return value)
+    # Then proceed with bulk operation
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Tools
+
+- [Snapshot](/api/snapshot) - Capture UI state for label-based interactions
+- [Click](/api/click) - Single element interaction
+- [Type](/api/type) - Single field text entry
+- [FileSystem](/api/filesystem) - File operations
+- [Process](/api/process) - Process management
+- [PowerShell](/api/shell) - Advanced scripting

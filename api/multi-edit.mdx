@@ -1,0 +1,269 @@
+---
+title: 'MultiEdit'
+description: 'Enter text into multiple input fields simultaneously'
+icon: 'pen-field'
+---
+
+## Overview
+
+The **MultiEdit** tool enters text into multiple input fields in a single operation. It's designed for efficiently filling out forms, entering data into multiple fields, or batch text entry operations.
+
+<Info>
+**Use Cases:** Form filling, bulk data entry, multi-field input, repeated text operations
+</Info>
+
+## Parameters
+
+<ParamField path="locs" type="list[list]">
+  List of edit operations where each item is `[x, y, text]`:
+  - `x`: X coordinate of the input field
+  - `y`: Y coordinate of the input field  
+  - `text`: The text to enter in that field
+  
+  Either `locs` or `labels` must be provided (not both).
+  
+  ```python
+  locs=[
+      [100, 200, "John Doe"],
+      [100, 250, "john@example.com"],
+      [100, 300, "555-1234"]
+  ]
+  ```
+</ParamField>
+
+<ParamField path="labels" type="list[list]">
+  List of edit operations where each item is `[label, text]`:
+  - `label`: UI element label/ID from a previous **Snapshot** call
+  - `text`: The text to enter in that field
+  
+  Either `locs` or `labels` must be provided (not both).
+  
+  <Warning>
+  Requires a recent **Snapshot** call. The desktop state must be populated before using labels.
+  </Warning>
+  
+  ```python
+  labels=[
+      [42, "John Doe"],
+      [43, "john@example.com"],
+      [44, "555-1234"]
+  ]
+  ```
+</ParamField>
+
+## Return Value
+
+Returns a string listing all edited elements with their coordinates and entered text:
+
+```
+Multi-edited elements at: (x1,y1) with text 'text1', (x2,y2) with text 'text2', (x3,y3) with text 'text3'
+```
+
+## Examples
+
+### Fill Form by Coordinates
+
+```python
+# Fill a registration form with name, email, and phone
+result = multi_edit_tool(
+    locs=[
+        [300, 200, "Alice Smith"],
+        [300, 260, "alice.smith@company.com"],
+        [300, 320, "(555) 123-4567"],
+        [300, 380, "123 Main Street"]
+    ]
+)
+# Returns: "Multi-edited elements at: (300,200) with text 'Alice Smith', ..."
+```
+
+### Fill Form Using Labels
+
+```python
+# First, take a snapshot to get element labels
+state_tool()
+
+# Fill form fields using their labels
+result = multi_edit_tool(
+    labels=[
+        [15, "Product A"],
+        [16, "100"],
+        [17, "Premium"],
+        [18, "Quarterly"]
+    ]
+)
+# Enters text in all four labeled fields
+```
+
+### Multi-Column Data Entry
+
+```python
+# Enter data into a spreadsheet or table
+result = multi_edit_tool(
+    locs=[
+        [200, 300, "Q1"],
+        [300, 300, "125000"],
+        [400, 300, "15.5%"],
+        [500, 300, "Approved"]
+    ]
+)
+# Fills a row with multiple values
+```
+
+### Batch Configuration Settings
+
+```python
+# Update multiple configuration fields
+state_tool()  # Get labels
+
+result = multi_edit_tool(
+    labels=[
+        [20, "api.example.com"],
+        [21, "30"],
+        [22, "true"],
+        [23, "/var/log/app.log"]
+    ]
+)
+# Updates server URL, timeout, debug flag, and log path
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Form Filling" icon="file-invoice">
+    Quickly fill out registration, login, or data entry forms with multiple fields.
+  </Card>
+  <Card title="Spreadsheet Data Entry" icon="table">
+    Enter data across multiple cells in spreadsheets or data grids.
+  </Card>
+  <Card title="Configuration" icon="sliders">
+    Update multiple settings or configuration fields simultaneously.
+  </Card>
+  <Card title="Batch Processing" icon="list-check">
+    Enter repetitive data across multiple similar input fields efficiently.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Either locs or labels must be provided">
+    **Error:** `ValueError: Either locs or labels must be provided.`
+    
+    **Cause:** Neither `locs` nor `labels` parameter was provided.
+    
+    **Solution:** Provide either a list of `[x, y, text]` items (`locs`) or `[label, text]` items (`labels`).
+  </Accordion>
+  
+  <Accordion title="Desktop state is empty">
+    **Error:** `ValueError: Desktop state is empty. Please call Snapshot first.`
+    
+    **Cause:** Using `labels` parameter without a recent **Snapshot** call.
+    
+    **Solution:** Call `state_tool()` (Snapshot) before using labels to populate the desktop state.
+  </Accordion>
+  
+  <Accordion title="Each label item must be [label, text]">
+    **Error:** `ValueError: Each label item must be [label, text]. Invalid: ...`
+    
+    **Cause:** A label list item doesn't have exactly 2 elements.
+    
+    **Solution:** Ensure each item in `labels` is a list/array with exactly 2 elements: `[label_id, text_string]`.
+  </Accordion>
+  
+  <Accordion title="Failed to process label item">
+    **Error:** `ValueError: Failed to process label item {item}: ...`
+    
+    **Cause:** The specified label doesn't exist in the current desktop state, or the label is invalid.
+    
+    **Solution:** Take a fresh snapshot and verify the label numbers. Ensure labels are integers.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Fresh Snapshots">
+    When using `labels`, call **Snapshot** immediately before to ensure accurate element identification.
+  </Step>
+  
+  <Step title="Verify Field Order">
+    Ensure input fields are in the correct tab order or spatial arrangement for sequential entry.
+  </Step>
+  
+  <Step title="Prefer Labels for Maintainability">
+    Use `labels` instead of fixed coordinates for more robust scripts that adapt to UI changes.
+  </Step>
+  
+  <Step title="Handle Different Field Types">
+    Be aware that different input types (text, number, date) may need specific text formats.
+  </Step>
+  
+  <Step title="Clear Existing Content">
+    Fields are clicked before typing, but existing content is NOT automatically cleared. Use **Type** tool with `clear=True` for single fields if needed.
+  </Step>
+  
+  <Step title="Test with Small Batches">
+    When filling many fields, test with a small subset first to verify correct targeting.
+  </Step>
+</Steps>
+
+## Technical Details
+
+### Implementation Flow
+
+1. **Coordinate Resolution**: If `labels` provided, each label is resolved to `[x, y]` coordinates
+2. **Conversion**: All items are converted to `[x, y, text]` format
+3. **Sequential Entry**: For each item:
+   - Click at `[x, y]` to focus the field
+   - Type the specified text
+   - Small delay before next field
+
+### Text Entry Behavior
+- Existing text is NOT cleared automatically
+- Text is entered at current cursor position in field
+- No Enter key pressed after text (unlike **Type** tool with `press_enter=True`)
+- Special characters and Unicode supported
+
+### Timing
+- Small delays between field entries for stability
+- No wait after final entry
+- Total time proportional to number of fields
+
+### Coordinate System
+- Uses virtual desktop coordinates (same as **Snapshot**)
+- Coordinates are absolute screen positions
+- Multi-monitor setups supported
+
+## Comparison: locs vs labels
+
+| Aspect | locs | labels |
+|--------|------|--------|
+| **Setup Required** | None | Requires Snapshot call |
+| **Structure** | `[x, y, text]` | `[label, text]` |
+| **Accuracy** | Fixed coordinates | Adapts to UI changes |
+| **Performance** | Slightly faster | Small lookup overhead |
+| **Best For** | Known static layouts | Dynamic UIs, reusable scripts |
+| **Maintenance** | Brittle if UI changes | Robust, self-updating |
+
+## Differences from Type Tool
+
+| Feature | MultiEdit | Type |
+|---------|-----------|------|
+| **Fields** | Multiple fields | Single field |
+| **Clear Option** | No | Yes (`clear=True`) |
+| **Press Enter** | No | Yes (`press_enter=True`) |
+| **Caret Position** | No control | Yes (`caret_position`) |
+| **Use Case** | Batch form filling | Single field with options |
+
+<Tip>
+For individual fields with specific requirements (clearing, pressing Enter, caret positioning), use the **Type** tool. Use **MultiEdit** for efficient batch operations across multiple fields.
+</Tip>
+
+## Related Tools
+
+- [**Type**](/api/type) - Single field text entry with more options
+- [**MultiSelect**](/api/multi-select) - Select multiple checkboxes or items
+- [**Click**](/api/click) - Focus fields before typing
+- [**Snapshot**](/api/snapshot) - Get UI element labels

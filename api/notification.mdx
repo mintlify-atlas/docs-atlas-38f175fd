@@ -1,0 +1,342 @@
+---
+title: 'Notification'
+description: 'Send Windows toast notifications to alert users'
+icon: 'bell'
+---
+
+## Overview
+
+The **Notification** tool sends native Windows toast notifications with custom title and message content. This is useful for alerting users about important events, task completion, errors, or any information that requires user attention.
+
+<Info>
+**Use Cases:** Remote alerts, task completion notifications, error alerts, status updates
+</Info>
+
+## Parameters
+
+<ParamField path="title" type="string" required>
+  The notification title. Displayed prominently at the top of the toast notification.
+  
+  ```python
+  title="Task Complete"
+  ```
+</ParamField>
+
+<ParamField path="message" type="string" required>
+  The notification message body. Provides detailed information below the title.
+  
+  ```python
+  message="Your backup has finished successfully. 150 files backed up."
+  ```
+</ParamField>
+
+## Return Value
+
+Returns a confirmation message:
+
+```
+Notification sent: <title>
+```
+
+Or an error message if the notification fails:
+
+```
+Error sending notification: <error_details>
+```
+
+## Examples
+
+### Basic Notification
+
+```python
+# Simple notification
+result = notification_tool(
+    title="Hello",
+    message="Windows-MCP is running successfully!"
+)
+# Returns: "Notification sent: Hello"
+```
+
+### Task Completion Alert
+
+```python
+# Notify when a long-running task completes
+result = notification_tool(
+    title="Data Processing Complete",
+    message="Processed 10,000 records in 5 minutes. Results saved to output.csv"
+)
+```
+
+### Error Notification
+
+```python
+# Alert user about an error
+result = notification_tool(
+    title="⚠️ Error Detected",
+    message="Failed to connect to database. Please check your network connection."
+)
+```
+
+### Progress Update
+
+```python
+# Periodic progress notifications
+for i in range(0, 101, 25):
+    notification_tool(
+        title=f"Processing: {i}% Complete",
+        message=f"Processed {i}/100 items. Please wait..."
+    )
+    # ... do work ...
+```
+
+### Multi-Step Workflow Alerts
+
+```python
+# Step 1: Start notification
+notification_tool(
+    title="Workflow Started",
+    message="Beginning automated backup process..."
+)
+
+# ... perform backup operations ...
+
+# Step 2: Completion notification
+notification_tool(
+    title="Workflow Complete",
+    message="Backup finished. All files saved successfully."
+)
+```
+
+### Remote Monitoring Alert
+
+```python
+# Alert remote user about system status
+import psutil
+
+cpu_usage = psutil.cpu_percent()
+if cpu_usage > 90:
+    notification_tool(
+        title="🔥 High CPU Usage Detected",
+        message=f"CPU usage is at {cpu_usage}%. Consider closing some applications."
+    )
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Remote Alerts" icon="satellite-dish">
+    Notify users about events when they're not actively watching the screen.
+  </Card>
+  <Card title="Task Completion" icon="circle-check">
+    Alert when long-running automated tasks finish.
+  </Card>
+  <Card title="Error Reporting" icon="triangle-exclamation">
+    Immediately notify users when errors or issues occur.
+  </Card>
+  <Card title="Status Updates" icon="info-circle">
+    Provide periodic updates on ongoing processes or system status.
+  </Card>
+</CardGroup>
+
+## Visual Appearance
+
+Windows toast notifications appear in the bottom-right corner of the screen (Windows 10/11) with:
+
+- **App Icon**: Windows-MCP or system icon
+- **Title**: Large, bold text at the top
+- **Message**: Regular text below the title
+- **Timestamp**: "Just now" or relative time
+- **Auto-dismiss**: Typically disappears after 5-7 seconds
+- **Action Center**: Stored in Action Center until dismissed
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Error sending notification">
+    **Error:** `"Error sending notification: <details>"`
+    
+    **Possible Causes:**
+    - Windows notification system is disabled
+    - Focus Assist is blocking notifications
+    - System permissions issue
+    - Windows notification service not running
+    
+    **Solutions:**
+    1. Check Windows Settings > System > Notifications
+    2. Ensure Focus Assist is off or configured properly
+    3. Verify Windows-MCP has notification permissions
+    4. Restart Windows notification service
+  </Accordion>
+  
+  <Accordion title="Notifications not appearing">
+    **Not an error in code, but a system configuration issue:**
+    
+    **Causes:**
+    - Focus Assist is enabled (Priority/Alarms only mode)
+    - Notification settings disabled for the app
+    - Windows in fullscreen exclusive mode (games)
+    - Do Not Disturb mode enabled
+    
+    **Solutions:**
+    1. Disable Focus Assist temporarily
+    2. Check app-specific notification permissions
+    3. Exit fullscreen applications
+    4. Check Action Center for suppressed notifications
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Clear, Concise Titles">
+    Keep titles under 50 characters. Use action-oriented language like "Task Complete" or "Error Detected".
+  </Step>
+  
+  <Step title="Provide Actionable Messages">
+    Include specific information and next steps in the message body.
+  </Step>
+  
+  <Step title="Don't Spam Notifications">
+    Avoid sending too many notifications in quick succession. Users may disable notifications entirely.
+  </Step>
+  
+  <Step title="Use Emoji Sparingly">
+    Emoji can add visual interest (⚠️, ✅, 🔥) but don't overuse them.
+  </Step>
+  
+  <Step title="Consider Timing">
+    Send notifications at appropriate times. Avoid notifications during known user focus periods.
+  </Step>
+  
+  <Step title="Test Visibility">
+    Verify notifications appear correctly and aren't blocked by Focus Assist or system settings.
+  </Step>
+</Steps>
+
+## Technical Details
+
+### Implementation
+
+The Notification tool uses Windows native toast notification APIs:
+
+1. Creates a toast notification object with title and message
+2. Sends to Windows notification system
+3. Windows displays the notification according to user settings
+4. Notification is stored in Action Center until dismissed
+
+### Platform Specifics
+
+- **Windows 10/11**: Full support for toast notifications
+- **Windows 8/8.1**: Basic notification support
+- **Windows 7**: Limited or no support (depending on configuration)
+
+### Notification Behavior
+
+- **Display Duration**: ~5-7 seconds (system default)
+- **Sound**: System notification sound (if enabled)
+- **Banner Style**: Standard Windows toast
+- **Persistence**: Stored in Action Center
+- **Clickable**: Users can click to dismiss
+
+### Character Limits
+
+- **Title**: ~50 characters recommended (truncated if longer)
+- **Message**: ~100 characters visible, up to 200 characters total
+- **Total**: Longer messages may be truncated with "..."
+
+<Tip>
+For longer messages, consider splitting into multiple notifications or using alternative alerting methods.
+</Tip>
+
+## Limitations
+
+<Warning>
+**Current Limitations:**
+- No custom icons or images
+- No action buttons (click/dismiss only)
+- No sound customization
+- No priority levels
+- No notification grouping
+</Warning>
+
+For advanced notification features, consider using:
+- **PowerShell** with Windows.UI.Notifications APIs
+- Third-party notification libraries
+- Custom Windows notification apps
+
+## Common Patterns
+
+### Try-Catch with Notification
+
+```python
+try:
+    # Attempt risky operation
+    result = perform_complex_task()
+    
+    # Success notification
+    notification_tool(
+        title="✅ Success",
+        message="Task completed successfully!"
+    )
+except Exception as e:
+    # Error notification
+    notification_tool(
+        title="❌ Error",
+        message=f"Task failed: {str(e)}"
+    )
+```
+
+### Long-Running Task with Milestones
+
+```python
+def long_task():
+    notification_tool("Starting", "Task initialization...")
+    
+    # Phase 1
+    do_phase_1()
+    notification_tool("Progress", "Phase 1 complete (33%)")
+    
+    # Phase 2
+    do_phase_2()
+    notification_tool("Progress", "Phase 2 complete (66%)")
+    
+    # Phase 3
+    do_phase_3()
+    notification_tool("Complete", "All phases finished! (100%)")
+```
+
+### System Monitoring
+
+```python
+import time
+import psutil
+
+while True:
+    cpu = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory().percent
+    
+    if cpu > 90 or memory > 90:
+        notification_tool(
+            title="⚠️ System Alert",
+            message=f"CPU: {cpu}%, RAM: {memory}%"
+        )
+    
+    time.sleep(60)  # Check every minute
+```
+
+## Accessibility
+
+Windows toast notifications support:
+- **Screen Readers**: Title and message are read by screen readers
+- **High Contrast**: Adapts to high contrast themes
+- **Keyboard**: Can be dismissed with keyboard shortcuts
+- **Visual Impairment**: Large text and clear contrast
+
+## Related Tools
+
+- [**Wait**](/api/wait) - Pause between operations before sending notifications
+- [**Process**](/api/process) - Monitor processes and send alerts
+- [**PowerShell**](/api/shell) - Advanced notification scripting
+- [**Scrape**](/api/scrape) - Fetch data and notify about changes

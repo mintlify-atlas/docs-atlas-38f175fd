@@ -1,0 +1,293 @@
+---
+title: Environment Variables
+description: Configure Windows-MCP behavior using environment variables for remote mode, telemetry, and other settings
+---
+
+Windows-MCP can be configured using environment variables to control its operating mode, enable remote connections, and customize server behavior.
+
+## Available Environment Variables
+
+<ParamField path="MODE" type="string" default="local">
+  Operating mode for Windows-MCP. Set to `local` to run directly on your machine, or `remote` to use cloud-hosted Windows automation via windowsmcp.io.
+</ParamField>
+
+<ParamField path="SANDBOX_ID" type="string">
+  The sandbox/VM identifier from windowsmcp.io. **Required when `MODE=remote`.**
+</ParamField>
+
+<ParamField path="API_KEY" type="string">
+  Your API key from windowsmcp.io. **Required when `MODE=remote`.**
+</ParamField>
+
+<ParamField path="ANONYMIZED_TELEMETRY" type="boolean" default="true">
+  Controls whether anonymized usage telemetry is collected. Set to `false` to disable telemetry.
+</ParamField>
+
+## Local Mode
+
+In local mode (default), Windows-MCP runs directly on your Windows machine and exposes its tools to the connected MCP client. This is the standard setup for personal use.
+
+### Configuration
+
+No environment variables are required for local mode. Simply run:
+
+```bash
+uvx windows-mcp
+```
+
+You can explicitly set the mode if desired:
+
+```bash
+MODE=local uvx windows-mcp
+```
+
+### Client Configuration
+
+For MCP clients like Claude Desktop, use the standard configuration:
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ]
+    }
+  }
+}
+```
+
+## Remote Mode
+
+In remote mode, Windows-MCP acts as a **proxy** that connects to [windowsmcp.io](https://windowsmcp.io), enabling cloud-hosted Windows automation. This is designed for scenarios where the MCP client is remote and connects through the dashboard, which routes requests to a Windows VM running Windows-MCP.
+
+### Prerequisites
+
+1. Create an account at [windowsmcp.io](https://windowsmcp.io)
+2. Obtain your `SANDBOX_ID` from the dashboard
+3. Generate an `API_KEY` for authentication
+
+### Configuration
+
+Three environment variables are required for remote mode:
+
+<CodeGroup>
+```bash Environment Variables
+# Set operating mode to remote
+MODE=remote
+
+# Your sandbox/VM identifier from the dashboard
+SANDBOX_ID=your-sandbox-id
+
+# Your Windows-MCP API key
+API_KEY=your-api-key
+```
+
+```json Claude Desktop Config
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ],
+      "env": {
+        "MODE": "remote",
+        "SANDBOX_ID": "your-sandbox-id",
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+</CodeGroup>
+
+### Command Line Usage
+
+```bash
+# Run with remote mode
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp
+
+# Remote mode with SSE transport
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp --transport sse --host localhost --port 8000
+
+# Remote mode with streamable-http transport
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp --transport streamable-http --host localhost --port 8000
+```
+
+### Validation
+
+Windows-MCP validates the required environment variables on startup:
+
+- If `MODE=remote` is set without `SANDBOX_ID`, you'll see: `ValueError: SANDBOX_ID is required for MODE: remote`
+- If `MODE=remote` is set without `API_KEY`, you'll see: `ValueError: API_KEY is required for MODE: remote`
+
+## Telemetry Configuration
+
+Windows-MCP collects anonymized usage data to help improve the server. **No personal information, tool arguments, or tool outputs are tracked.**
+
+### What is Collected
+
+The telemetry system tracks:
+- Tool names used (e.g., "Click-Tool", "Type-Tool")
+- Error occurrences (without sensitive details)
+- Basic usage patterns
+
+### What is NOT Collected
+
+- Personal information
+- Tool arguments or parameters
+- Tool outputs or results
+- File paths or system data
+- Screenshots or UI state
+
+### Disabling Telemetry
+
+To disable telemetry, set `ANONYMIZED_TELEMETRY` to `false`:
+
+<CodeGroup>
+```bash Command Line
+ANONYMIZED_TELEMETRY=false uvx windows-mcp
+```
+
+```json Claude Desktop Config
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ],
+      "env": {
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+</CodeGroup>
+
+<Note>
+Telemetry is **enabled by default** (`ANONYMIZED_TELEMETRY=true`). You must explicitly set it to `false` to disable.
+</Note>
+
+## Configuration Examples
+
+### Local Mode with Telemetry Disabled
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ],
+      "env": {
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+### Remote Mode with All Options
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ],
+      "env": {
+        "MODE": "remote",
+        "SANDBOX_ID": "your-sandbox-id",
+        "API_KEY": "your-api-key",
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+### Source Installation with Remote Mode
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\Users\\YourUser\\Windows-MCP",
+        "run",
+        "windows-mcp"
+      ],
+      "env": {
+        "MODE": "remote",
+        "SANDBOX_ID": "your-sandbox-id",
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+## Implementation Details
+
+The environment variable configuration is implemented in `src/windows_mcp/__main__.py`:
+
+```python
+@dataclass
+class Config:
+    mode: str
+    sandbox_id: str = field(default='')
+    api_key: str = field(default='')
+
+config = Config(
+    mode=os.getenv("MODE", Mode.LOCAL.value).lower(),
+    sandbox_id=os.getenv("SANDBOX_ID", ''),
+    api_key=os.getenv("API_KEY", '')
+)
+```
+
+Telemetry is controlled via:
+
+```python
+if os.getenv("ANONYMIZED_TELEMETRY", "true").lower() != "false":
+    analytics = PostHogAnalytics()
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ValueError: SANDBOX_ID is required for MODE: remote">
+    You've set `MODE=remote` but haven't provided a `SANDBOX_ID`. Get your sandbox ID from the windowsmcp.io dashboard and add it to your configuration.
+  </Accordion>
+
+  <Accordion title="ValueError: API_KEY is required for MODE: remote">
+    You've set `MODE=remote` but haven't provided an `API_KEY`. Generate an API key from the windowsmcp.io dashboard and add it to your configuration.
+  </Accordion>
+
+  <Accordion title="Telemetry not disabled">
+    Ensure you're setting `ANONYMIZED_TELEMETRY` to exactly `"false"` (string). The check is case-insensitive but must be the string "false".
+  </Accordion>
+
+  <Accordion title="Environment variables not taking effect">
+    For MCP clients like Claude Desktop, ensure environment variables are set in the `env` object of the configuration file, not as system environment variables.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Transport Options" icon="network-wired" href="/configuration/transport-options">
+    Configure different transport layers for network access
+  </Card>
+  <Card title="Security" icon="shield" href="/security">
+    Learn about security considerations for remote deployments
+  </Card>
+</CardGroup>

@@ -1,0 +1,801 @@
+---
+title: 'Tools Overview'
+description: 'Complete reference for all 15 Windows-MCP tools'
+icon: 'wrench'
+---
+
+## Overview
+
+Windows-MCP exposes **15 MCP tools** that enable AI agents to interact with the Windows desktop. Tools are organized into categories based on their primary function.
+
+<Note>
+  All tools are registered in `src/windows_mcp/__main__.py` and delegate to methods in the **Desktop service** (`src/windows_mcp/desktop/service.py`).
+</Note>
+
+---
+
+## Tool Categories
+
+<CardGroup cols={3}>
+  <Card title="Observation" icon="eye" color="#3b82f6">
+    Snapshot
+  </Card>
+  
+  <Card title="Input Simulation" icon="hand-pointer" color="#8b5cf6">
+    Click, Type, Scroll, Move, Shortcut
+  </Card>
+  
+  <Card title="Window Management" icon="window-restore" color="#10b981">
+    App
+  </Card>
+  
+  <Card title="System Operations" icon="terminal" color="#f59e0b">
+    Shell (PowerShell), FileSystem, Process, Registry, Clipboard
+  </Card>
+  
+  <Card title="Web Content" icon="globe" color="#06b6d4">
+    Scrape
+  </Card>
+  
+  <Card title="Batch Operations" icon="list-check" color="#ec4899">
+    MultiSelect, MultiEdit
+  </Card>
+  
+  <Card title="Utility" icon="clock" color="#6366f1">
+    Wait, Notification
+  </Card>
+</CardGroup>
+
+---
+
+## Observation Tools
+
+### Snapshot
+
+<Info>
+  **Primary tool** for understanding the current desktop state. Always call this first before taking actions.
+</Info>
+
+**Description**: Captures a complete snapshot of the desktop including system language, focused/opened windows, interactive elements (buttons, text fields, links, menus with coordinates), and scrollable areas.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `use_vision` | `bool` | `false` | Include screenshot with cursor highlight |
+| `use_annotation` | `bool` | `true` | Draw bounding boxes on UI elements |
+| `use_ui_tree` | `bool` | `true` | Extract interactive/scrollable elements |
+| `use_dom` | `bool` | `false` | Browser content mode (web page elements only) |
+| `width_reference_lines` | `int` | `null` | Grid overlay width divisions (requires vision) |
+| `height_reference_lines` | `int` | `null` | Grid overlay height divisions (requires vision) |
+| `display` | `list[int]` | `null` | Limit to specific displays (e.g., `[0]` or `[0,1]`) |
+
+**Returns**:
+- Cursor position
+- Screenshot resolution and region
+- Active virtual desktop
+- All virtual desktops
+- Focused window
+- List of opened windows
+- Interactive elements with labels and coordinates
+- Scrollable elements with scroll position
+- Optional: Annotated screenshot as PNG image
+
+**Special Modes**:
+
+<AccordionGroup>
+  <Accordion title="DOM Mode (use_dom=True)" icon="globe">
+    When enabled on a browser window (Chrome, Edge, Firefox), Snapshot extracts only the web page content and filters out browser UI elements.
+    
+    **Use Case**: Web automation without browser chrome interference.
+    
+    **Requirements**: `use_ui_tree=True` (DOM mode requires UI tree extraction).
+  </Accordion>
+
+  <Accordion title="Vision Mode (use_vision=True)" icon="image">
+    Includes a screenshot image (PNG format) with the cursor position highlighted by a red circle and crosshair.
+    
+    **Use Case**: Visual debugging, vision-enabled LLMs.
+    
+    **Performance**: Screenshots are capped to 1920×1080 for token efficiency.
+  </Accordion>
+
+  <Accordion title="Annotation Mode (use_annotation=True)" icon="highlighter">
+    Draws colored bounding boxes around detected interactive elements on the screenshot.
+    
+    **Use Case**: Visual confirmation of element detection.
+    
+    **Note**: Only applies when `use_vision=True`.
+  </Accordion>
+
+  <Accordion title="Display Filtering (display=[0,1])" icon="display">
+    Limits snapshot to specific monitors in multi-display setups.
+    
+    **Use Case**: Focus on specific screen in multi-monitor environments.
+    
+    **Format**: JSON array of zero-indexed display numbers.
+  </Accordion>
+</AccordionGroup>
+
+**Implementation**:
+- Calls `Desktop.get_state()` which orchestrates window enumeration, tree traversal, and screenshot capture
+- Tree service identifies interactive elements via UIAutomation accessibility tree
+- Screenshots use `PIL.ImageGrab` with virtual screen support
+
+**Annotations**:
+- `readOnlyHint`: `true`
+- `destructiveHint`: `false`
+- `idempotentHint`: `true`
+
+---
+
+## Input Simulation Tools
+
+### Click
+
+**Description**: Performs mouse clicks at specified coordinates or by UI element label.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `loc` | `list[int]` | `null` | `[x, y]` coordinates (provide either loc or label) |
+| `label` | `int` | `null` | UI element label from Snapshot (provide either loc or label) |
+| `button` | `str` | `"left"` | `"left"`, `"right"`, or `"middle"` |
+| `clicks` | `int` | `1` | 0=hover only, 1=single click, 2=double click |
+
+**Examples**:
+```python
+# Click at coordinates
+Click(loc=[500, 300], button="left", clicks=1)
+
+# Double-click an element by label
+Click(label=5, clicks=2)
+
+# Right-click for context menu
+Click(loc=[800, 400], button="right")
+
+# Hover without clicking
+Click(loc=[200, 150], clicks=0)
+```
+
+**Implementation**: Uses `uia.Click()`, `uia.RightClick()`, or `uia.MiddleClick()` with double-click timing support.
+
+---
+
+### Type
+
+**Description**: Types text at specified coordinates or by UI element label.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `text` | `str` | *required* | Text to type |
+| `loc` | `list[int]` | `null` | `[x, y]` coordinates (provide either loc or label) |
+| `label` | `int` | `null` | UI element label from Snapshot (provide either loc or label) |
+| `clear` | `bool` | `false` | Clear existing text before typing |
+| `caret_position` | `str` | `"idle"` | `"start"`, `"idle"`, or `"end"` |
+| `press_enter` | `bool` | `false` | Submit after typing |
+
+**Examples**:
+```python
+# Type into a text field
+Type(text="Hello World", loc=[400, 200])
+
+# Clear and replace text
+Type(text="New Value", label=3, clear=True)
+
+# Type and submit
+Type(text="search query", label=7, press_enter=True)
+
+# Insert at start
+Type(text="Prefix: ", loc=[300, 100], caret_position="start")
+```
+
+**Implementation**: Clicks target, optionally moves caret, selects all with Ctrl+A if clearing, then uses `uia.SendKeys()` with escaped text.
+
+---
+
+### Scroll
+
+**Description**: Scrolls at coordinates, by label, or at current mouse position.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `loc` | `list[int]` | `null` | `[x, y]` coordinates (optional) |
+| `label` | `int` | `null` | UI element label from Snapshot (optional) |
+| `type` | `str` | `"vertical"` | `"vertical"` or `"horizontal"` |
+| `direction` | `str` | `"down"` | `"up"`, `"down"`, `"left"`, or `"right"` |
+| `wheel_times` | `int` | `1` | Number of wheel rotations (1 ≈ 3-5 lines) |
+
+**Examples**:
+```python
+# Scroll down in a specific region
+Scroll(loc=[600, 400], direction="down", wheel_times=3)
+
+# Scroll horizontally
+Scroll(label=10, type="horizontal", direction="right", wheel_times=2)
+
+# Scroll at current cursor position
+Scroll(direction="up")
+```
+
+**Implementation**: Moves cursor to target (if specified), then uses `uia.WheelUp()`/`uia.WheelDown()` with Shift key for horizontal scrolling.
+
+---
+
+### Move
+
+**Description**: Moves mouse cursor or performs drag-and-drop.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `loc` | `list[int]` | *required* | `[x, y]` target coordinates |
+| `label` | `int` | `null` | UI element label (alternative to loc) |
+| `drag` | `bool` | `false` | Drag from current position to target |
+
+**Examples**:
+```python
+# Simple cursor move (hover)
+Move(loc=[500, 300])
+
+# Drag and drop
+Move(loc=[800, 400], drag=True)
+
+# Move to element by label
+Move(label=12)
+```
+
+**Implementation**: Uses `uia.MoveTo()` for hover, or `uia.DragDrop()` for drag operations.
+
+---
+
+### Shortcut
+
+**Description**: Executes keyboard shortcuts using key combinations.
+
+**Key Parameters**:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `shortcut` | `str` | Key combination separated by `+` (e.g., `"ctrl+c"`) |
+
+**Examples**:
+```python
+# Copy
+Shortcut(shortcut="ctrl+c")
+
+# Paste
+Shortcut(shortcut="ctrl+v")
+
+# Switch apps
+Shortcut(shortcut="alt+tab")
+
+# Open Run dialog
+Shortcut(shortcut="win+r")
+
+# Task Manager
+Shortcut(shortcut="ctrl+shift+esc")
+
+# Open Start Menu
+Shortcut(shortcut="win")
+```
+
+**Implementation**: Parses shortcut string, maps aliases (e.g., `backspace` → `Back`), and calls `uia.SendKeys()` with special key syntax.
+
+---
+
+## Window Management Tools
+
+### App
+
+**Description**: Opens/launches applications and manages window state (resize, switch focus).
+
+**Modes**:
+
+<Tabs>
+  <Tab title="launch">
+    Opens an application from the Start Menu.
+    
+    **Parameters**:
+    - `name` (str, required): Application name (fuzzy matched, 70% threshold)
+    
+    **Example**:
+    ```python
+    App(mode="launch", name="notepad")
+    App(mode="launch", name="chrome")
+    ```
+    
+    **Implementation**:
+    - Queries `Get-StartApps` PowerShell cmdlet or scans Start Menu shortcuts
+    - Uses fuzzy matching (`thefuzz`) to find app
+    - Launches via `Start-Process` with PassThru for PID tracking
+    - Waits up to 10 seconds for window to appear using UIAutomation
+  </Tab>
+  
+  <Tab title="resize">
+    Resizes and/or repositions a window.
+    
+    **Parameters**:
+    - `name` (str, optional): Window name (fuzzy matched). If omitted, resizes active window.
+    - `window_loc` (list[int], optional): `[x, y]` position. If omitted, keeps current position.
+    - `window_size` (list[int], optional): `[width, height]` size. If omitted, keeps current size.
+    
+    **Example**:
+    ```python
+    # Resize active window
+    App(mode="resize", window_size=[1024, 768])
+    
+    # Move and resize specific window
+    App(mode="resize", name="notepad", window_loc=[100, 100], window_size=[800, 600])
+    ```
+    
+    **Limitations**: Cannot resize minimized or maximized windows (returns error).
+  </Tab>
+  
+  <Tab title="switch">
+    Brings a window into focus.
+    
+    **Parameters**:
+    - `name` (str, required): Window name (fuzzy matched)
+    
+    **Example**:
+    ```python
+    App(mode="switch", name="chrome")
+    ```
+    
+    **Implementation**:
+    - Finds window by fuzzy name match
+    - Restores if minimized
+    - Uses `win32gui.SetForegroundWindow()` with thread input attachment for reliable focus stealing
+  </Tab>
+</Tabs>
+
+**Annotations**:
+- `readOnlyHint`: `false`
+- `destructiveHint`: `true` (can launch/modify applications)
+- `idempotentHint`: `false`
+
+---
+
+## System Operations Tools
+
+### PowerShell (Shell)
+
+**Description**: Executes PowerShell commands with full system access.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `command` | `str` | *required* | PowerShell command to execute |
+| `timeout` | `int` | `30` | Execution timeout in seconds |
+
+**Examples**:
+```powershell
+# List files
+PowerShell(command="Get-ChildItem C:\\Users")
+
+# Download file
+PowerShell(command="Invoke-WebRequest -Uri 'https://example.com/file.txt' -OutFile 'C:\\temp\\file.txt'")
+
+# System information
+PowerShell(command="Get-ComputerInfo")
+```
+
+**Implementation**:
+- Sets `$OutputEncoding` and `[Console]::OutputEncoding` to UTF-8 for proper text handling
+- Base64-encodes command to bypass PowerShell parsing issues
+- Rebuilds PATH from registry to discover system executables
+- Prefers `pwsh` (PowerShell 7+) if available, falls back to `powershell` (5.1)
+- Returns stdout/stderr and status code
+
+<Warning>
+  **Security**: This tool has full system access. Use only in trusted environments.
+</Warning>
+
+---
+
+### FileSystem
+
+**Description**: Manages file system operations with eight modes.
+
+**Modes**: `read`, `write`, `copy`, `move`, `delete`, `list`, `search`, `info`
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | `str` | *required* | Operation mode |
+| `path` | `str` | *required* | File/directory path (relative to Desktop if not absolute) |
+| `destination` | `str` | `null` | Target path (for copy/move) |
+| `content` | `str` | `null` | File content (for write) |
+| `pattern` | `str` | `null` | Glob pattern (for list/search) |
+| `recursive` | `bool` | `false` | Recursive operation |
+| `append` | `bool` | `false` | Append mode for write |
+| `offset` | `int` | `null` | Line offset for read |
+| `limit` | `int` | `null` | Line limit for read |
+
+**Examples**:
+```python
+# Read file
+FileSystem(mode="read", path="document.txt")
+
+# Write file
+FileSystem(mode="write", path="output.txt", content="Hello World")
+
+# Copy directory
+FileSystem(mode="copy", path="source", destination="backup", recursive=True)
+
+# List directory with pattern
+FileSystem(mode="list", path="C:\\Projects", pattern="*.py", recursive=True)
+
+# Search for files
+FileSystem(mode="search", path="C:\\", pattern="**/*.log", recursive=True)
+
+# Get file info
+FileSystem(mode="info", path="document.docx")
+
+# Delete directory
+FileSystem(mode="delete", path="temp_folder", recursive=True)
+```
+
+**Default Directory**: Relative paths resolve from user's Desktop folder (`platformdirs.user_desktop_dir()`).
+
+---
+
+### Process
+
+**Description**: Lists and terminates running processes.
+
+**Modes**: `list`, `kill`
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | `str` | *required* | `"list"` or `"kill"` |
+| `name` | `str` | `null` | Process name filter/target |
+| `pid` | `int` | `null` | Process ID (for kill) |
+| `sort_by` | `str` | `"memory"` | Sort by `"memory"`, `"cpu"`, or `"name"` (for list) |
+| `limit` | `int` | `20` | Maximum results (for list) |
+| `force` | `bool` | `false` | Force kill (for kill) |
+
+**Examples**:
+```python
+# List top memory consumers
+Process(mode="list", sort_by="memory", limit=10)
+
+# List processes by name
+Process(mode="list", name="chrome")
+
+# Kill by PID
+Process(mode="kill", pid=1234)
+
+# Force kill by name
+Process(mode="kill", name="notepad", force=True)
+```
+
+**Implementation**: Uses `psutil` library for process enumeration and termination.
+
+---
+
+### Registry
+
+**Description**: Read and write the Windows Registry.
+
+**Modes**: `get`, `set`, `delete`, `list`
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | `str` | *required* | Operation mode |
+| `path` | `str` | *required* | Registry path (PowerShell format) |
+| `name` | `str` | `null` | Value name |
+| `value` | `str` | `null` | Value data (for set) |
+| `type` | `str` | `"String"` | `"String"`, `"DWord"`, `"QWord"`, `"Binary"`, `"MultiString"`, `"ExpandString"` |
+
+**Examples**:
+```powershell
+# Read value
+Registry(mode="get", path="HKCU:\\Software\\MyApp", name="Version")
+
+# Set value
+Registry(mode="set", path="HKCU:\\Software\\MyApp", name="Theme", value="Dark", type="String")
+
+# List keys and values
+Registry(mode="list", path="HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion")
+
+# Delete value
+Registry(mode="delete", path="HKCU:\\Software\\MyApp", name="OldSetting")
+
+# Delete key
+Registry(mode="delete", path="HKCU:\\Software\\ObsoleteApp")
+```
+
+**Path Format**: Uses PowerShell drive notation (e.g., `HKCU:\`, `HKLM:\`).
+
+---
+
+### Clipboard
+
+**Description**: Copy/paste clipboard operations.
+
+**Modes**: `get`, `set`
+
+**Key Parameters**:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `mode` | `str` | `"get"` (read) or `"set"` (write) |
+| `text` | `str` | Text to set (for set mode) |
+
+**Examples**:
+```python
+# Read clipboard
+Clipboard(mode="get")
+
+# Set clipboard
+Clipboard(mode="set", text="Hello, World!")
+```
+
+**Implementation**: Uses `win32clipboard` API for Unicode text clipboard access.
+
+---
+
+## Web Content Tools
+
+### Scrape
+
+**Description**: Fetches and extracts web page content.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `url` | `str` | *required* | Web page URL |
+| `query` | `str` | `null` | Focus extraction on specific information |
+| `use_dom` | `bool` | `false` | Extract from active browser tab instead of HTTP |
+| `use_sampling` | `bool` | `true` | LLM-process content for clean summary |
+
+**Modes**:
+
+<Tabs>
+  <Tab title="HTTP Mode (default)">
+    Performs HTTP request and extracts content.
+    
+    **Process**:
+    1. `requests.get(url)` with 10s timeout
+    2. Convert HTML to Markdown via `markdownify`
+    3. Optional: LLM sampling for clean summary (if `use_sampling=True` and MCP client supports sampling)
+    
+    **Example**:
+    ```python
+    Scrape(url="https://example.com")
+    Scrape(url="https://docs.python.org", query="asyncio tutorial")
+    ```
+  </Tab>
+  
+  <Tab title="DOM Mode (use_dom=True)">
+    Extracts content from active browser tab's DOM.
+    
+    **Use Case**: When site blocks HTTP requests or requires authentication.
+    
+    **Process**:
+    1. Calls `Snapshot(use_dom=True)` to get browser DOM
+    2. Extracts text from `dom_informative_nodes`
+    3. Adds scroll position indicators
+    
+    **Example**:
+    ```python
+    # Open site in browser first, then:
+    Scrape(url="https://protected-site.com", use_dom=True)
+    ```
+    
+    **Returns**: Markdown content with scroll indicators:
+    ```
+    Reached top / Scroll up to see more
+    [page content]
+    Reached bottom / Scroll down to see more
+    ```
+  </Tab>
+</Tabs>
+
+**Annotations**:
+- `readOnlyHint`: `true`
+- `openWorldHint`: `true` (accesses external URLs)
+
+---
+
+## Batch Operations Tools
+
+### MultiSelect
+
+**Description**: Selects multiple items (files, folders, checkboxes) with optional Ctrl key.
+
+**Key Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `locs` | `list[list[int]]` | `null` | List of `[x, y]` coordinates |
+| `labels` | `list[int]` | `null` | List of element labels from Snapshot |
+| `press_ctrl` | `bool` | `true` | Hold Ctrl during clicks for multi-select |
+
+**Examples**:
+```python
+# Multi-select files with Ctrl
+MultiSelect(locs=[[100, 200], [100, 250], [100, 300]], press_ctrl=True)
+
+# Multi-select by labels
+MultiSelect(labels=[5, 7, 9], press_ctrl=True)
+
+# Multiple independent clicks
+MultiSelect(locs=[[400, 300], [600, 400]], press_ctrl=False)
+```
+
+**Implementation**: Holds Ctrl key, performs clicks with 0.2s intervals, then releases Ctrl.
+
+---
+
+### MultiEdit
+
+**Description**: Enters text into multiple input fields at specified coordinates.
+
+**Key Parameters**:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `locs` | `list[list]` | List of `[x, y, text]` entries |
+| `labels` | `list[list]` | List of `[label, text]` entries |
+
+**Examples**:
+```python
+# Multi-edit by coordinates
+MultiEdit(locs=[
+    [300, 200, "John Doe"],
+    [300, 250, "john@example.com"],
+    [300, 300, "555-1234"]
+])
+
+# Multi-edit by labels
+MultiEdit(labels=[
+    [5, "First Name"],
+    [6, "Last Name"],
+    [7, "Email"]
+])
+```
+
+**Implementation**: Iterates through entries, clicking each location and typing text with `clear=True`.
+
+---
+
+## Utility Tools
+
+### Wait
+
+**Description**: Pauses execution for specified duration.
+
+**Key Parameters**:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `duration` | `int` | Wait time in seconds |
+
+**Use Cases**:
+- Wait for applications to launch/load
+- Allow UI animations to complete
+- Wait for page content to render
+- Delay between rapid actions
+
+**Example**:
+```python
+# Wait 3 seconds
+Wait(duration=3)
+```
+
+**Implementation**: `time.sleep(duration)`
+
+**Annotations**:
+- `readOnlyHint`: `true`
+- `idempotentHint`: `true`
+
+---
+
+### Notification
+
+**Description**: Sends a Windows toast notification.
+
+**Key Parameters**:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `title` | `str` | Notification title |
+| `message` | `str` | Notification body text |
+
+**Example**:
+```python
+Notification(title="Task Complete", message="Your automation workflow finished successfully.")
+```
+
+**Use Case**: Alert the user remotely or provide status updates.
+
+**Implementation**: Uses Windows.UI.Notifications COM API via PowerShell to display native Windows 10/11 toast notifications.
+
+---
+
+## Tool Usage Patterns
+
+### Basic Observation-Action Pattern
+
+```python
+# 1. Observe desktop state
+state = Snapshot(use_vision=False)
+
+# 2. Parse interactive elements and find target
+# (Agent identifies element label for "Submit" button: 15)
+
+# 3. Perform action
+Click(label=15)
+```
+
+### Multi-Step Workflow
+
+```python
+# Launch application
+App(mode="launch", name="notepad")
+Wait(duration=2)
+
+# Take snapshot to find text area
+state = Snapshot()
+
+# Type content
+Type(text="Hello, World!", label=3)
+
+# Save file
+Shortcut(shortcut="ctrl+s")
+Wait(duration=1)
+
+# Type filename in save dialog
+Type(text="output.txt", label=8, press_enter=True)
+```
+
+### Web Automation
+
+```python
+# Launch browser
+App(mode="launch", name="chrome")
+Wait(duration=3)
+
+# Navigate to URL (via address bar)
+state = Snapshot()
+Click(label=1)  # Address bar
+Type(text="https://example.com", press_enter=True)
+Wait(duration=2)
+
+# Scrape content in DOM mode
+content = Scrape(url="https://example.com", use_dom=True)
+
+# Interact with page
+state = Snapshot(use_dom=True)
+Click(label=5)  # Click link
+```
+
+---
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="layer-group" href="/concepts/architecture">
+    Understand the layered service architecture
+  </Card>
+  
+  <Card title="Operation Modes" icon="circle-nodes" href="/concepts/modes">
+    Learn about Local vs Remote modes
+  </Card>
+</CardGroup>

@@ -1,80 +1,614 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get your first Windows automation running in minutes with this hands-on quickstart guide
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This quickstart guide will walk you through your first Windows-MCP automation: opening Notepad, typing text, and saving a file. By the end, you'll understand the basic workflow and be ready to build more complex automations.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+This guide assumes you've already [installed Windows-MCP](/installation) and have it running in your MCP client (Claude Desktop, Perplexity, etc.).
 </Note>
+
+## The Basic Workflow
+
+Every Windows-MCP automation follows a simple pattern:
+
+<Steps>
+  <Step title="Observe">
+    Use the `Snapshot` tool to capture the current desktop state
+  </Step>
+  <Step title="Plan">
+    Analyze the interactive elements and plan your actions
+  </Step>
+  <Step title="Act">
+    Use tools like `Click`, `Type`, `App`, etc. to perform actions
+  </Step>
+  <Step title="Verify">
+    Take another snapshot to confirm the action succeeded
+  </Step>
+</Steps>
+
+## Your First Automation
+
+Let's automate a simple task: create a text file using Notepad.
+
+### Step 1: Take a Snapshot
+
+First, let's see what's currently on the desktop. In your MCP client, say:
+
+```
+Take a screenshot of my desktop
+```
+
+The AI will use the `Snapshot` tool, which returns:
+
+<CodeGroup>
+```text Desktop State
+Cursor Position: (1024, 768)
+Screenshot Resolution: 1920x1080
+
+Active Desktop:
+Desktop 0 (current)
+
+Focused Window:
+Program Manager (Desktop)
+
+Opened Windows:
+- Program Manager (1920x1080 at 0,0)
+- Microsoft Edge (1200x800 at 100,100)
+
+List of Interactive Elements:
+[1] Button "Start" at (10, 1050)
+[2] Button "Search" at (60, 1050)
+[3] Button "Task View" at (110, 1050)
+...
+
+List of Scrollable Elements:
+No scrollable elements found.
+```
+
+```python Screenshot (if use_vision=True)
+# A PNG screenshot with bounding boxes around interactive elements
+# Each element is labeled with its ID number for easy reference
+```
+</CodeGroup>
+
+The snapshot reveals:
+- Current cursor position
+- Active windows and their positions
+- Interactive elements with coordinates
+- Scrollable regions
+
+<Info>
+The `Snapshot` tool is your eyes into the Windows desktop. Always call it first to understand the current state before taking actions.
+</Info>
+
+### Step 2: Launch Notepad
+
+Now let's open Notepad. Say:
+
+```
+Open Notepad
+```
+
+The AI will use the `App` tool with mode `launch`:
+
+```python
+App(
+  mode="launch",
+  name="Notepad"
+)
+```
+
+Under the hood, this:
+1. Opens the Start menu
+2. Searches for "Notepad"
+3. Launches the application
+4. Returns: `"Launched Notepad successfully"`
+
+<Tip>
+The `App` tool can launch any application from the Start menu. Just provide the application name as it appears in Windows Search.
+</Tip>
+
+### Step 3: Verify Notepad Opened
+
+Good practice: verify the action succeeded. Say:
+
+```
+Take another snapshot
+```
+
+You should now see Notepad in the list of opened windows:
+
+```text
+Opened Windows:
+- Notepad (800x600 at 560,240)
+- Program Manager (1920x1080 at 0,0)
+- Microsoft Edge (1200x800 at 100,100)
+
+Focused Window:
+Notepad - Untitled
+
+List of Interactive Elements:
+[5] Text field "Text Editor" at (580, 300) size 760x500
+[6] Button "File" at (570, 250)
+[7] Button "Edit" at (610, 250)
+...
+```
+
+Notepad is now open and focused, with a text editor element at coordinates (580, 300).
+
+### Step 4: Type Text
+
+Let's type some text in the editor. You can reference the element by coordinates or by its label ID:
+
+```
+Type "Hello from Windows-MCP!" in the text editor
+```
+
+The AI will use the `Type` tool:
+
+<CodeGroup>
+```python Using Coordinates
+Type(
+  text="Hello from Windows-MCP!",
+  loc=[580, 300]
+)
+```
+
+```python Using Label ID
+Type(
+  text="Hello from Windows-MCP!",
+  label=5
+)
+```
+</CodeGroup>
+
+Both methods work identically. Using label IDs is more robust because coordinates may change if the window moves.
+
+The tool returns: `"Typed 'Hello from Windows-MCP!' at (580,300)"`
+
+<Note>
+The `Type` tool supports several options:
+- `clear=True`: Clear existing text before typing
+- `press_enter=True`: Press Enter after typing
+- `caret_position="start"`: Position cursor at start of field
+</Note>
+
+### Step 5: Save the File
+
+Now let's save the file using the keyboard shortcut Ctrl+S:
+
+```
+Press Ctrl+S to save
+```
+
+The AI uses the `Shortcut` tool:
+
+```python
+Shortcut(shortcut="ctrl+s")
+```
+
+This opens the Save dialog. Take another snapshot to see it:
+
+```text
+Focused Window:
+Save As
+
+List of Interactive Elements:
+[10] Text field "File name" at (700, 600)
+[11] Button "Save" at (900, 700)
+[12] Button "Cancel" at (1000, 700)
+...
+```
+
+### Step 6: Enter Filename and Save
+
+Type a filename and click Save:
+
+```
+Type "my-first-automation.txt" in the filename field and click Save
+```
+
+The AI executes multiple tools in sequence:
+
+```python
+# Type the filename
+Type(
+  text="my-first-automation.txt",
+  label=10
+)
+
+# Click the Save button
+Click(
+  label=11,
+  button="left",
+  clicks=1
+)
+```
+
+The file is now saved to your Documents folder!
+
+## Understanding the Tools
+
+Let's review the key tools you used:
+
+### Snapshot Tool
+
+Captures complete desktop state:
+
+```python
+Snapshot(
+  use_vision=True,        # Include screenshot with annotations
+  use_dom=False,          # Extract web page DOM (for browsers)
+  use_annotation=True,    # Draw bounding boxes on screenshot
+  use_ui_tree=True,       # Extract interactive elements
+  display=[0]             # Limit to specific monitors
+)
+```
+
+**When to use:**
+- Before any action (to understand current state)
+- After actions (to verify success)
+- When debugging unexpected behavior
+
+### App Tool
+
+Manage applications and windows:
+
+```python
+# Launch an application
+App(mode="launch", name="Notepad")
+
+# Resize a window
+App(mode="resize", name="Notepad", window_size=[800, 600])
+
+# Switch to a window
+App(mode="switch", name="Microsoft Edge")
+```
+
+**Common applications:**
+- "Notepad", "Calculator", "Paint"
+- "Microsoft Edge", "Google Chrome", "Firefox"
+- "Word", "Excel", "PowerPoint" (if installed)
+- "File Explorer", "Command Prompt", "PowerShell"
+
+### Type Tool
+
+Enter text into input fields:
+
+```python
+# Basic typing
+Type(text="Hello", loc=[x, y])
+
+# Clear and type
+Type(text="New text", label=5, clear=True)
+
+# Type and submit
+Type(text="Search query", label=3, press_enter=True)
+
+# Position cursor
+Type(text="Insert", label=8, caret_position="start")
+```
+
+### Click Tool
+
+Perform mouse clicks:
+
+```python
+# Single left click
+Click(loc=[x, y], button="left", clicks=1)
+
+# Double click to open
+Click(label=5, clicks=2)
+
+# Right click for context menu
+Click(loc=[x, y], button="right")
+
+# Hover without clicking
+Click(label=10, clicks=0)
+```
+
+### Shortcut Tool
+
+Execute keyboard shortcuts:
+
+```python
+# Common shortcuts
+Shortcut(shortcut="ctrl+c")    # Copy
+Shortcut(shortcut="ctrl+v")    # Paste
+Shortcut(shortcut="ctrl+s")    # Save
+Shortcut(shortcut="alt+tab")   # Switch windows
+Shortcut(shortcut="win")       # Open Start menu
+Shortcut(shortcut="ctrl+shift+esc")  # Task Manager
+```
+
+## More Practical Examples
+
+### Example 1: Web Search Automation
+
+Automate a web search in Microsoft Edge:
+
+```
+1. Open Microsoft Edge
+2. Take a snapshot
+3. Click the address bar
+4. Type "Windows automation MCP" and press Enter
+5. Wait 2 seconds for the page to load
+6. Take a snapshot to see search results
+```
+
+The AI translates this to:
+
+```python
+App(mode="launch", name="Microsoft Edge")
+Wait(duration=2)
+Snapshot(use_vision=True)
+Click(label=15)  # Address bar
+Type(text="Windows automation MCP", label=15, press_enter=True)
+Wait(duration=2)
+Snapshot(use_vision=True, use_dom=True)  # Capture web page content
+```
+
+### Example 2: File Management
+
+Create a folder structure and organize files:
+
+```
+1. Open File Explorer
+2. Navigate to Documents
+3. Create a new folder called "Projects"
+4. Create subfolders "Active" and "Archive"
+```
+
+Using the `FileSystem` tool:
+
+```python
+# Create directory structure
+FileSystem(
+  mode="write",
+  path="Projects/Active/README.txt",
+  content="Active projects folder"
+)
+
+FileSystem(
+  mode="write",
+  path="Projects/Archive/README.txt",
+  content="Archived projects folder"
+)
+
+# List contents
+FileSystem(
+  mode="list",
+  path="Projects",
+  recursive=True
+)
+```
+
+### Example 3: System Information Gathering
+
+Collect system information using PowerShell:
+
+```
+Get system information: OS version, CPU, memory, and disk space
+```
+
+The AI uses the `PowerShell` tool:
+
+```python
+PowerShell(
+  command="Get-ComputerInfo | Select-Object WindowsVersion, CsProcessors, CsTotalPhysicalMemory | Format-List",
+  timeout=30
+)
+
+PowerShell(
+  command="Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table",
+  timeout=30
+)
+```
+
+## Advanced Techniques
+
+### Using Label IDs vs Coordinates
+
+**Coordinates** are absolute pixel positions:
+```python
+Click(loc=[800, 400])
+```
+
+Pros: Direct and explicit
+Cons: Break if window moves or screen resolution changes
+
+**Label IDs** reference elements from the last snapshot:
+```python
+Click(label=5)
+```
+
+Pros: More robust, survives window movement
+Cons: Requires recent snapshot
+
+<Tip>
+Prefer label IDs when working with UI elements. Use coordinates only for specific pixel-precise operations.
+</Tip>
+
+### Working with Multiple Monitors
+
+Limit snapshots to specific displays:
+
+```python
+# Only capture primary monitor (display 0)
+Snapshot(display=[0])
+
+# Capture displays 0 and 1
+Snapshot(display=[0, 1])
+
+# Capture all displays (default)
+Snapshot()
+```
+
+### Browser Automation with DOM Mode
+
+When automating web browsers, use `use_dom=True` to extract clean page content:
+
+```python
+# Regular snapshot - includes browser UI
+Snapshot(use_vision=True)
+
+# DOM mode - only web page content
+Snapshot(use_dom=True)
+```
+
+DOM mode:
+- Filters out browser toolbars, tabs, and buttons
+- Returns clean web page text and interactive elements
+- Faster and more token-efficient
+- Shows scroll position ("Scroll up to see more" / "Scroll down to see more")
+
+### Multi-Action Tools
+
+For bulk operations, use specialized tools:
+
+```python
+# Select multiple files with Ctrl held down
+MultiSelect(
+  labels=[10, 11, 12, 13],
+  press_ctrl=True
+)
+
+# Fill multiple form fields at once
+MultiEdit(
+  labels=[
+    [5, "John Doe"],      # Name field
+    [6, "john@example.com"],  # Email field
+    [7, "555-1234"]       # Phone field
+  ]
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Start with a Snapshot">
+    Before taking any action, call `Snapshot` to understand the current desktop state. This prevents errors from outdated assumptions.
+  </Accordion>
+  
+  <Accordion title="Use Wait After Slow Operations">
+    After launching applications, loading web pages, or opening dialogs, use `Wait` to ensure the UI is ready:
+    ```python
+    App(mode="launch", name="Microsoft Word")
+    Wait(duration=3)  # Wait for Word to fully load
+    Snapshot()
+    ```
+  </Accordion>
+  
+  <Accordion title="Verify Actions Succeeded">
+    Take a snapshot after important actions to confirm they worked:
+    ```python
+    Click(label=10)  # Click Save button
+    Wait(duration=1)
+    Snapshot()  # Verify dialog closed
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Shortcuts for Common Actions">
+    Keyboard shortcuts are faster and more reliable than clicking:
+    ```python
+    # Instead of clicking File > Save
+    Shortcut(shortcut="ctrl+s")
+    
+    # Instead of clicking Edit > Copy
+    Shortcut(shortcut="ctrl+c")
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Errors Gracefully">
+    If an action fails, take a snapshot to understand why:
+    ```python
+    # Action failed? Take a snapshot to debug
+    Snapshot(use_vision=True)
+    ```
+    
+    Common issues:
+    - Window focus changed unexpectedly
+    - Dialog appeared (update, permission request, etc.)
+    - Element not ready yet (use Wait)
+    - Element moved (outdated label ID)
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tips
+
+### Action Didn't Work?
+
+1. **Take a fresh snapshot** - Your label IDs may be outdated
+2. **Check window focus** - Make sure the right window is active
+3. **Add Wait time** - UI may not be ready yet
+4. **Use use_vision=True** - See exactly what the desktop looks like
+5. **Check coordinates** - Element may have moved
+
+### Can't Find an Element?
+
+1. **Verify window is open** - Check "Opened Windows" in snapshot
+2. **Scroll to element** - May be off-screen
+3. **Switch to correct window** - Use `App(mode="switch")`
+4. **Wait for element to appear** - Use `Wait` tool
+5. **Check element type** - Some elements aren't detected (images, canvases)
+
+### Automation is Slow?
+
+1. **Remove unnecessary snapshots** - Only snapshot when needed
+2. **Use shortcuts instead of clicking** - `ctrl+s` is faster than File > Save
+3. **Disable use_vision** - Vision adds overhead if you don't need screenshots
+4. **Batch operations** - Use `MultiSelect` and `MultiEdit` for bulk actions
+5. **Use FileSystem directly** - Don't automate File Explorer for file operations
+
+## Security Considerations
+
+<Warning>
+Windows-MCP has **full system access**. Be cautious when:
+- Running automation from untrusted sources
+- Using the `PowerShell` tool with external input
+- Modifying registry keys with the `Registry` tool
+- Deleting files with the `FileSystem` tool
+</Warning>
+
+Best practices:
+- Review automation scripts before running
+- Test in a VM or Windows Sandbox first
+- Avoid hardcoding sensitive credentials
+- Disable telemetry if handling sensitive data
+- Read the [Security Policy](https://github.com/CursorTouch/Windows-MCP/blob/main/SECURITY.md)
+
+## What's Next?
+
+You now understand the fundamentals of Windows-MCP automation. Explore more:
+
+<CardGroup cols={2}>
+  <Card title="Tool Reference" icon="wrench" href="/concepts/tools-overview">
+    Complete documentation for all 16 Windows-MCP tools
+  </Card>
+  <Card title="Examples" icon="code" href="/guides/advanced-usage">
+    Real-world automation examples and use cases
+  </Card>
+  <Card title="API Reference" icon="book" href="/api">
+    Detailed API documentation and architecture
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/installation">
+    Solutions to common issues and errors
+  </Card>
+</CardGroup>
+
+## Community and Support
+
+Join the Windows-MCP community:
+
+- **Discord**: [Join the discussion](https://discord.com/invite/Aue9Yj2VzS)
+- **Twitter**: [@CursorTouch](https://x.com/CursorTouch)
+- **GitHub Issues**: [Report bugs](https://github.com/CursorTouch/Windows-MCP/issues)
+- **GitHub Discussions**: [Ask questions](https://github.com/CursorTouch/Windows-MCP/discussions)
+
+<Tip>
+Check out [Windows-Use](https://pypi.org/project/windows-use/), an agent built using Windows-MCP for even more automation capabilities!
+</Tip>

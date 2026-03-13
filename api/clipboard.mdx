@@ -1,0 +1,310 @@
+---
+title: 'Clipboard'
+description: 'Read and write Windows clipboard text content'
+icon: 'clipboard'
+---
+
+## Overview
+
+The **Clipboard** tool provides access to the Windows system clipboard, allowing you to read current clipboard content or set new text. This is essential for copy-paste operations, text transfer between applications, and temporary data storage.
+
+<Info>
+**Keywords:** copy, paste, cut, clipboard, text transfer
+</Info>
+
+## Modes
+
+The Clipboard tool operates in two modes:
+
+<CardGroup cols={2}>
+  <Card title="get" icon="arrow-down">
+    Read the current clipboard content
+  </Card>
+  <Card title="set" icon="arrow-up">
+    Write text to the clipboard
+  </Card>
+</CardGroup>
+
+## Parameters
+
+<ParamField path="mode" type="string" required>
+  The operation mode. Must be either `"get"` or `"set"`.
+  
+  ```python
+  mode="get"  # Read clipboard
+  mode="set"  # Write clipboard
+  ```
+</ParamField>
+
+<ParamField path="text" type="string">
+  The text to write to the clipboard. **Required** when `mode="set"`, ignored when `mode="get"`.
+  
+  ```python
+  text="Hello, World!"
+  ```
+</ParamField>
+
+## Return Value
+
+### Mode: get
+
+Returns the current clipboard content:
+
+```
+Clipboard content:
+<clipboard_text>
+```
+
+Or if clipboard is empty or contains non-text data:
+
+```
+Clipboard is empty or contains non-text data.
+```
+
+### Mode: set
+
+Returns confirmation of the operation:
+
+```
+Clipboard set to: <first_100_chars>...
+```
+
+Long text is truncated to 100 characters in the confirmation message.
+
+## Examples
+
+### Read Clipboard Content
+
+```python
+# Get current clipboard text
+result = clipboard_tool(mode="get")
+# Returns: "Clipboard content:\nSome copied text"
+```
+
+### Copy Text to Clipboard
+
+```python
+# Set clipboard with new text
+result = clipboard_tool(
+    mode="set",
+    text="https://example.com/important-link"
+)
+# Returns: "Clipboard set to: https://example.com/important-link"
+```
+
+### Transfer Text Between Applications
+
+```python
+# Read from one app
+original = clipboard_tool(mode="get")
+
+# Process the text
+processed_text = original.upper()  # Example transformation
+
+# Write back to clipboard
+clipboard_tool(
+    mode="set",
+    text=processed_text
+)
+```
+
+### Copy-Paste Workflow
+
+```python
+# Select and copy text from a document
+click_tool(loc=[300, 200])  # Click start position
+move_tool(loc=[500, 200], drag=True)  # Drag to select
+shortcut_tool("ctrl+c")  # Copy selection
+
+# Read what was copied
+copied_text = clipboard_tool(mode="get")
+print(copied_text)
+
+# Navigate to another app and paste
+app_tool(mode="switch", name="Notepad")
+click_tool(loc=[100, 100])
+shortcut_tool("ctrl+v")  # Paste
+```
+
+### Store and Retrieve Data
+
+```python
+# Store data temporarily in clipboard
+important_data = "User ID: 12345, Token: abc...xyz"
+clipboard_tool(mode="set", text=important_data)
+
+# ... perform other operations ...
+
+# Retrieve the stored data
+retrieved = clipboard_tool(mode="get")
+print(retrieved)
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Text Transfer" icon="arrow-right-arrow-left">
+    Move text content between different applications or windows.
+  </Card>
+  <Card title="Data Extraction" icon="download">
+    Extract copied text from applications for processing or storage.
+  </Card>
+  <Card title="Automated Copy-Paste" icon="copy">
+    Implement automated workflows that require copying and pasting data.
+  </Card>
+  <Card title="Temporary Storage" icon="database">
+    Use clipboard as temporary storage for text data during multi-step operations.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Mode must be either 'get' or 'set'">
+    **Error:** `'Error: mode must be either "get" or "set".'`
+    
+    **Cause:** Invalid mode parameter provided.
+    
+    **Solution:** Use only `mode="get"` or `mode="set"`.
+  </Accordion>
+  
+  <Accordion title="Text parameter required for set mode">
+    **Error:** `"Error: text parameter required for set mode."`
+    
+    **Cause:** `mode="set"` was used without providing the `text` parameter.
+    
+    **Solution:** Always provide `text` when using `mode="set"`:
+    ```python
+    clipboard_tool(mode="set", text="your text here")
+    ```
+  </Accordion>
+  
+  <Accordion title="Clipboard is empty or contains non-text data">
+    **Not an Error:** This is a normal return message when the clipboard doesn't contain text.
+    
+    **Cause:** The clipboard is empty, or contains images, files, or other non-text data.
+    
+    **Note:** The Clipboard tool only handles Unicode text (CF_UNICODETEXT format). Use other tools or direct API calls for non-text clipboard content.
+  </Accordion>
+  
+  <Accordion title="Error managing clipboard">
+    **Error:** `"Error managing clipboard: <error_details>"`
+    
+    **Cause:** Various possible causes:
+    - Another application has locked the clipboard
+    - Permission issues
+    - System resource problems
+    
+    **Solution:** 
+    - Wait a moment and retry
+    - Check if another application is heavily using the clipboard
+    - Verify application permissions
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Check Before Overwriting">
+    If preserving existing clipboard content matters, read it with `mode="get"` before setting new content.
+  </Step>
+  
+  <Step title="Handle Empty Clipboard">
+    When reading clipboard, check if the result indicates empty or non-text content before processing.
+  </Step>
+  
+  <Step title="Use for Text Only">
+    The Clipboard tool only handles text. For images, files, or other formats, use **PowerShell** with .NET clipboard APIs.
+  </Step>
+  
+  <Step title="Combine with Shortcuts">
+    Use with **Shortcut** tool (`ctrl+c`, `ctrl+v`, `ctrl+x`) for complete copy-paste workflows.
+  </Step>
+  
+  <Step title="Consider Security">
+    Be cautious when reading clipboard content in shared environments - it may contain sensitive data.
+  </Step>
+</Steps>
+
+## Technical Details
+
+### Implementation
+
+The tool uses the Windows `win32clipboard` API:
+
+1. **Opening Clipboard**: `OpenClipboard()` - Locks clipboard for exclusive access
+2. **Reading**: 
+   - Checks for Unicode text format availability
+   - Reads `CF_UNICODETEXT` data
+3. **Writing**:
+   - Empties clipboard first
+   - Sets new Unicode text data
+4. **Closing**: Always closes clipboard in `finally` block
+
+### Clipboard Formats
+
+- **Supported**: Unicode text (`CF_UNICODETEXT`)
+- **Not Supported**: Images, files, HTML, RTF, custom formats
+
+### Concurrency
+
+- Only one application can open the clipboard at a time
+- The tool properly releases the clipboard after each operation
+- Brief delays between operations recommended if doing rapid clipboard access
+
+### Data Limits
+
+- No practical size limit for text (Windows handles large clipboard content)
+- Return messages truncate display to 100 characters for readability
+- Actual clipboard content is not truncated
+
+## Platform Limitations
+
+<Warning>
+This tool is **Windows-specific** and requires the `win32clipboard` module (part of `pywin32`). It will not work on macOS or Linux.
+</Warning>
+
+## Common Patterns
+
+### Save and Restore Clipboard
+
+```python
+# Save current clipboard
+original = clipboard_tool(mode="get")
+
+# Use clipboard for temporary operations
+clipboard_tool(mode="set", text="temporary data")
+# ... do something with temporary data ...
+
+# Restore original clipboard
+if "Clipboard content:" in original:
+    clipboard_tool(mode="set", text=original.split(":\n", 1)[1])
+```
+
+### Clipboard-Based Data Pipeline
+
+```python
+# Extract data from App A
+click_tool(loc=[100, 100])
+shortcut_tool("ctrl+a")  # Select all
+shortcut_tool("ctrl+c")  # Copy
+data = clipboard_tool(mode="get")
+
+# Process data
+processed = data.upper().strip()
+
+# Insert into App B
+app_tool(mode="switch", name="App B")
+clipboard_tool(mode="set", text=processed)
+click_tool(loc=[200, 200])
+shortcut_tool("ctrl+v")  # Paste
+```
+
+## Related Tools
+
+- [**Shortcut**](/api/shortcut) - Keyboard shortcuts for copy (`ctrl+c`) and paste (`ctrl+v`)
+- [**Type**](/api/type) - Direct text entry without clipboard
+- [**MultiEdit**](/api/multi-edit) - Batch text entry
+- [**FileSystem**](/api/filesystem) - Read/write files for persistent storage

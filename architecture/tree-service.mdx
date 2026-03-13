@@ -1,0 +1,283 @@
+---
+title: "Tree Service"
+description: "Captures Windows accessibility tree and identifies interactive elements"
+---
+
+## Overview
+
+The Tree Service (`tree/service.py`) captures the Windows accessibility tree from active and background windows, identifies interactive UI elements and scrollable areas, and provides structured data for automation tools.
+
+## Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="Accessibility Tree Traversal" icon="sitemap">
+    Walk the UIAutomation tree to discover all UI elements
+  </Card>
+  <Card title="Element Classification" icon="tags">
+    Identify interactive elements (buttons, text fields, links)
+  </Card>
+  <Card title="Scrollable Region Detection" icon="scroll">
+    Find scrollable areas and calculate scroll positions
+  </Card>
+  <Card title="DOM Extraction" icon="code">
+    Extract clean web page content from browsers
+  </Card>
+</CardGroup>
+
+## Key Classes
+
+### Tree Class
+
+The main `Tree` class in `tree/service.py` provides:
+
+<AccordionGroup>
+  <Accordion title="get_tree_state()">
+    Captures the complete UI element tree for visible windows.
+    
+    **Parameters:**
+    - `use_dom: bool` - Extract browser DOM content
+    - `display_indices: list[int]` - Limit to specific displays
+    
+    **Returns:** `TreeState` object with interactive and scrollable elements
+  </Accordion>
+  
+  <Accordion title="on_focus_change()">
+    Callback invoked by WatchDog when window focus changes.
+    
+    Invalidates cached tree data to ensure fresh element discovery.
+  </Accordion>
+  
+  <Accordion title="_traverse_tree()">
+    Recursively walks the UIAutomation tree using ThreadPoolExecutor.
+    
+    **Threading:** Uses multi-threaded traversal for performance on complex UIs.
+  </Accordion>
+  
+  <Accordion title="_is_interactive()">
+    Determines if a UI element is interactive based on control type and patterns.
+    
+    **Criteria:**
+    - Has Invoke, Toggle, SelectionItem, or Value patterns
+    - Is a Button, Edit, Link, MenuItem, etc.
+  </Accordion>
+</AccordionGroup>
+
+## Data Models
+
+The `tree/views.py` module defines element data models:
+
+### TreeState
+
+```python
+@dataclass
+class TreeState:
+    interactive_elements: list[TreeElementNode]
+    scrollable_elements: list[ScrollElementNode]
+    dom_node: DOMNode | None
+    dom_informative_nodes: list[DOMNode]
+```
+
+Contains all discovered UI elements from the accessibility tree.
+
+### TreeElementNode
+
+```python
+@dataclass
+class TreeElementNode:
+    label: int  # Unique label ID for referencing
+    control_type: str
+    name: str
+    bounding_box: BoundingBox
+    automation_id: str | None
+    class_name: str | None
+```
+
+Represents an interactive UI element (button, text field, link, etc.).
+
+### ScrollElementNode
+
+```python
+@dataclass
+class ScrollElementNode:
+    label: int
+    name: str
+    bounding_box: BoundingBox
+    can_scroll_horizontal: bool
+    can_scroll_vertical: bool
+    scroll_percent_horizontal: float
+    scroll_percent_vertical: float
+```
+
+Represents a scrollable region with current scroll position.
+
+## Control Type Configuration
+
+The `tree/config.py` file defines which control types are considered interactive:
+
+```python
+# Interactive control types
+INTERACTIVE_CONTROLS = {
+    "Button",
+    "Edit",
+    "Hyperlink", 
+    "ComboBox",
+    "ListItem",
+    "MenuItem",
+    "RadioButton",
+    "CheckBox",
+    "TabItem",
+    "TreeItem",
+    "DataItem",
+}
+
+# Control types that can scroll
+SCROLLABLE_CONTROLS = {
+    "List",
+    "DataGrid",
+    "Tree",
+    "Document",
+    "Pane",
+}
+```
+
+## Multi-Threaded Traversal
+
+The Tree Service uses `ThreadPoolExecutor` for performance:
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+THREAD_MAX_RETRIES = 3
+THREAD_POOL_SIZE = 4
+
+def _traverse_tree(self, root_element):
+    with ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE) as executor:
+        # Submit child traversal tasks to thread pool
+        futures = []
+        for child in root_element.children:
+            future = executor.submit(self._process_element, child)
+            futures.append(future)
+        
+        # Collect results
+        for future in futures:
+            future.result()
+```
+
+<Info>
+Multi-threaded traversal reduces tree extraction time from ~1000ms to ~300ms for complex UIs.
+</Info>
+
+## DOM Mode
+
+When `use_dom=True`, the Tree Service extracts browser content:
+
+```python
+def _extract_dom(self, window):
+    # Detect browser (Chrome, Edge, Firefox, Arc)
+    if self._is_browser(window.process_name):
+        # Find document element
+        doc_element = self._find_document_element()
+        
+        # Filter out browser UI (address bar, tabs, toolbars)
+        # Keep only web page content elements
+        web_content = self._filter_browser_ui(doc_element)
+        
+        return web_content
+```
+
+<Tip>
+DOM mode filters out browser UI elements (address bar, tabs, back button) to return only the actual web page content.
+</Tip>
+
+## Caching and Invalidation
+
+The Tree Service caches element data to avoid repeated traversal:
+
+```python
+class Tree:
+    def __init__(self):
+        self._cached_tree_state: TreeState | None = None
+        self._cache_timestamp: float = 0
+    
+    def on_focus_change(self, event):
+        # Invalidate cache when focus changes
+        self._cached_tree_state = None
+        self._cache_timestamp = 0
+```
+
+WatchDog calls `on_focus_change()` to invalidate the cache when windows switch.
+
+## Retry Logic
+
+UI element access can fail due to timing issues. The Tree Service retries:
+
+```python
+THREAD_MAX_RETRIES = 3
+
+def _get_element_property(element, property_name):
+    for attempt in range(THREAD_MAX_RETRIES):
+        try:
+            return getattr(element, property_name)
+        except COMError:
+            if attempt == THREAD_MAX_RETRIES - 1:
+                raise
+            time.sleep(0.1)
+```
+
+<Warning>
+Some UI elements disappear during traversal (tooltips, popups). Retry logic helps handle transient elements.
+</Warning>
+
+## Label ID Assignment
+
+Each interactive element gets a unique label ID:
+
+```python
+self._label_counter = 0
+
+def _assign_label(self, element: TreeElementNode):
+    element.label = self._label_counter
+    self._label_counter += 1
+```
+
+Label IDs are used by Click, Type, Scroll, and Move tools to reference elements.
+
+## Best Practices
+
+<Steps>
+  <Step title="Use DOM mode for browsers">
+    Enable `use_dom=True` when working with web pages to get clean content
+  </Step>
+  <Step title="Reference by label ID">
+    Use label IDs instead of coordinates for robust automation
+  </Step>
+  <Step title="Handle cache invalidation">
+    Assume tree state is stale after window switches - call Snapshot again
+  </Step>
+  <Step title="Respect threading limits">
+    Very deep UI trees may hit thread pool limits - tree extraction may timeout
+  </Step>
+</Steps>
+
+## Performance Characteristics
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| Simple window (Notepad) | ~100ms | Few elements, shallow tree |
+| Complex app (Visual Studio) | ~500ms | Many elements, deep nesting |
+| Browser with DOM mode | ~300ms | Filters UI, extracts page content |
+| Multi-threaded traversal | 3-4x faster | vs. sequential traversal |
+
+## Source Files
+
+- **Service**: `src/windows_mcp/tree/service.py`
+- **Data Models**: `src/windows_mcp/tree/views.py`
+- **Configuration**: `src/windows_mcp/tree/config.py`
+- **Utilities**: `src/windows_mcp/tree/utils.py`
+- **Cache Utils**: `src/windows_mcp/tree/cache_utils.py`
+
+## Related Architecture
+
+- [Desktop Service](/architecture/desktop-service) - Calls Tree Service for element discovery
+- [UIAutomation Wrapper](/architecture/uia-wrapper) - Provides COM API access
+- [WatchDog](/architecture/watchdog) - Notifies Tree Service of focus changes

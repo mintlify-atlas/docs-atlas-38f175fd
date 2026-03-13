@@ -1,0 +1,181 @@
+---
+title: "Type"
+description: "Enter text at specified locations with keyboard simulation"
+---
+
+## Overview
+
+The Type tool enters text at specified screen coordinates or UI elements identified by label ID from Snapshot. Supports clearing existing text, setting caret position, and pressing Enter after typing.
+
+## Parameters
+
+<ParamField path="text" type="string" required>
+  The text to type. Can include special characters and Unicode.
+</ParamField>
+
+<ParamField path="loc" type="list[int]" optional>
+  Screen coordinates `[x, y]` of the input field. Either `loc` or `label` must be provided.
+</ParamField>
+
+<ParamField path="label" type="int" optional>
+  Label ID of a UI element from Snapshot. Either `loc` or `label` must be provided.
+</ParamField>
+
+<ParamField path="clear" type="bool" default="false">
+  Clear existing text before typing. Set to `true` to replace text, `false` to append.
+</ParamField>
+
+<ParamField path="caret_position" type="string" default="idle">
+  Where to position the caret:
+  - `"idle"` - Don't move caret (default)
+  - `"start"` - Move to beginning of field
+  - `"end"` - Move to end of field
+</ParamField>
+
+<ParamField path="press_enter" type="bool" default="false">
+  Press Enter key after typing to submit forms or execute commands.
+</ParamField>
+
+## Return Value
+
+Returns a success message indicating the text typed and coordinates.
+
+Example: `"Typed hello world at (350,400)."`
+
+## Examples
+
+### Type Text in Input Field
+
+```json
+{
+  "text": "hello@example.com",
+  "loc": [350, 400]
+}
+```
+
+Types the email address at coordinates (350, 400) without clearing existing text.
+
+### Replace Existing Text
+
+```json
+{
+  "text": "New Document Name",
+  "label": 25,
+  "clear": true
+}
+```
+
+Clears the text field (element 25) and types the new text.
+
+### Type and Submit Form
+
+```json
+{
+  "text": "search query",
+  "loc": [500, 200],
+  "press_enter": true
+}
+```
+
+Types "search query" and presses Enter to submit the search.
+
+### Append to End of Text
+
+```json
+{
+  "text": " - edited",
+  "label": 12,
+  "caret_position": "end"
+}
+```
+
+Moves caret to the end of element 12 and appends " - edited".
+
+### Insert at Beginning
+
+```json
+{
+  "text": "Draft: ",
+  "loc": [300, 150],
+  "caret_position": "start"
+}
+```
+
+Moves caret to the beginning and inserts "Draft: " prefix.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Form Filling" icon="file-lines">
+    Enter data into text fields, email inputs, and forms
+  </Card>
+  <Card title="Search Queries" icon="magnifying-glass">
+    Type search terms and submit with Enter key
+  </Card>
+  <Card title="Document Editing" icon="pen-to-square">
+    Replace or append text in editors and text areas
+  </Card>
+  <Card title="Command Entry" icon="terminal">
+    Type commands in terminal or command prompts
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Warning>
+The Type tool types the entire text at once. For programming in IDEs, use the Shell or FileSystem tools to create/edit code files instead.
+</Warning>
+
+<Steps>
+  <Step title="Click the input field first">
+    Use Click tool to focus the input field before typing
+  </Step>
+  <Step title="Use clear=true to replace">
+    When updating existing text, set `clear: true` to avoid appending
+  </Step>
+  <Step title="Set caret position deliberately">
+    Use `caret_position` to control where text is inserted
+  </Step>
+  <Step title="Add Wait for animations">
+    Use Wait tool after typing to allow autocomplete or validation to complete
+  </Step>
+</Steps>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Either loc or label must be provided">
+    You must specify either `loc` (coordinates) or `label` (element ID).
+  </Accordion>
+  <Accordion title="Desktop state is empty. Please call Snapshot first">
+    When using `label`, call Snapshot first to get UI element information.
+  </Accordion>
+  <Accordion title="Location must be a list of exactly 2 integers [x, y]">
+    The `loc` parameter must be `[x, y]` format with two numbers.
+  </Accordion>
+  <Accordion title="Failed to find element with label X">
+    The label ID is not in current Snapshot. Refresh with a new Snapshot call.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Details
+
+- **Typing speed**: ~10ms delay between keystrokes for reliable input
+- **Character support**: Supports Unicode, special characters, and emoji
+- **Focus handling**: Automatically clicks the target location before typing
+- **Implementation**: Uses Windows SendInput API for keyboard simulation
+
+<Info>
+For large code blocks or file content, use the FileSystem tool's write mode instead of Type.
+</Info>
+
+## Related Tools
+
+- [Click](/api/click) - Click on input fields before typing
+- [Snapshot](/api/snapshot) - Get label IDs for input fields
+- [Shortcut](/api/shortcut) - Press keyboard shortcuts like Ctrl+A, Ctrl+V
+- [MultiEdit](/api/multi-edit) - Type into multiple fields at once
+
+## Implementation
+
+Source: `src/windows_mcp/__main__.py:323-363`

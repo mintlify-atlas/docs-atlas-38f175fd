@@ -1,0 +1,341 @@
+---
+title: 'Telemetry & Data Privacy'
+description: 'Understanding what data Windows-MCP collects, how to disable it, and privacy guarantees'
+icon: 'chart-line'
+---
+
+## Overview
+
+Windows-MCP collects **anonymous usage data** to help improve the MCP server. This page explains exactly what data is collected, what is NOT collected, and how to disable telemetry if desired.
+
+<Info>
+Telemetry is **enabled by default** but can be completely disabled via environment variable.
+</Info>
+
+## What Data is Collected
+
+Windows-MCP uses [PostHog](https://posthog.com/) for analytics. The following data points are tracked:
+
+### Tool Execution Metrics
+
+- **Tool name**: Which tool was executed (e.g., `Click`, `Type`, `Shell`, `Snapshot`)
+- **Execution status**: Whether the tool call succeeded or failed
+- **Execution duration**: Time taken to complete the operation (in milliseconds)
+- **Client information**: MCP client name and version (e.g., Claude Desktop, Perplexity, Gemini CLI)
+- **Session ID**: A unique identifier for the current MCP server session (`mcp_<timestamp>_<pid>`)
+- **Mode**: Whether running in `local` or `remote` mode
+- **Anonymized user ID**: A persistent random UUID stored in your temp folder (`.windows-mcp-user-id`)
+
+### Error Tracking
+
+When a tool execution fails:
+
+- **Exception type**: The type of error that occurred
+- **Error message**: The error description (without sensitive data)
+- **Tool name**: Which tool encountered the error
+- **Duration**: Time before the error occurred
+- **Client information**: Same as above
+
+## What Data is NOT Collected
+
+<Warning>
+**Privacy Guarantee**
+
+Windows-MCP **NEVER** collects:
+
+- **Tool arguments**: Text you typed, coordinates clicked, file paths, URLs, PowerShell commands, or any input parameters
+- **Tool outputs**: Screenshots, command results, web scraping content, clipboard data, or any return values
+- **Personal information**: IP addresses (not stored), usernames, computer names, or any user identifiers beyond the random UUID
+- **File contents**: Documents, code, or any data from your system
+- **UI element data**: Window titles, button labels, or accessibility tree information
+</Warning>
+
+### Example: What Gets Logged
+
+When you execute a tool, here's what gets tracked vs. what doesn't:
+
+<CodeGroup>
+```json Telemetry Data (What IS Collected)
+{
+  "event": "tool_executed",
+  "tool_name": "Type",
+  "success": true,
+  "duration_ms": 245,
+  "client_name": "Claude Desktop",
+  "client_version": "0.7.3",
+  "session_id": "mcp_1710340123456_7890",
+  "mode": "local",
+  "user_id": "01a2b3c4-d5e6-7890-abcd-ef1234567890"
+}
+```
+
+```json Private Data (What is NOT Collected)
+{
+  // NEVER tracked:
+  "text": "confidential password",
+  "coordinates": {"x": 500, "y": 300},
+  "clear": true,
+  "output": "Text successfully typed",
+  "screenshot": "base64_image_data...",
+  "command": "Get-ChildItem C:\\Sensitive\\"
+}
+```
+</CodeGroup>
+
+## Privacy Implementation
+
+The telemetry implementation is transparent and auditable:
+
+### User Identification
+
+Windows-MCP generates a **random UUID** on first run and stores it in:
+
+```
+%TEMP%\.windows-mcp-user-id
+```
+
+This UUID:
+- Is randomly generated using UUID v7 (time-ordered)
+- Cannot be traced back to your identity
+- Persists across sessions to enable usage pattern analysis
+- Can be deleted at any time (a new one will be generated)
+
+### Session Tracking
+
+Each time the MCP server starts, a new session ID is created:
+
+```python
+mcp_interaction_id = f"mcp_{int(time.time() * 1000)}_{os.getpid()}"
+```
+
+This helps correlate tool calls within a single automation workflow without identifying the user.
+
+### Analytics Decorator
+
+All tools are wrapped with the `@with_analytics` decorator in `src/windows_mcp/__main__.py`. This decorator:
+
+1. Records the start time
+2. Executes the tool function
+3. Calculates execution duration
+4. Tracks success/failure status
+5. Sends **only metadata** to PostHog (no arguments or outputs)
+
+<Note>
+The analytics code is open source and can be reviewed in `src/windows_mcp/analytics.py`.
+</Note>
+
+## How to Disable Telemetry
+
+You can completely disable telemetry by setting the `ANONYMIZED_TELEMETRY` environment variable to `false` in your MCP client configuration.
+
+### Claude Desktop
+
+Add the `env` section to your `claude_desktop_config.json`:
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"],
+      "env": {
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+### Perplexity Desktop
+
+In the Connector configuration JSON:
+
+```json
+{
+  "command": "uvx",
+  "args": ["windows-mcp"],
+  "env": {
+    "ANONYMIZED_TELEMETRY": "false"
+  }
+}
+```
+
+### Gemini CLI
+
+In `%USERPROFILE%/.gemini/settings.json`:
+
+```json settings.json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"],
+      "env": {
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+### Qwen Code
+
+In `%USERPROFILE%/.qwen/settings.json`:
+
+```json settings.json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"],
+      "env": {
+        "ANONYMIZED_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+### Codex CLI
+
+In `%USERPROFILE%/.codex/config.toml`:
+
+```toml config.toml
+[mcp_servers.windows-mcp]
+command = "uvx"
+args = ["windows-mcp"]
+
+[mcp_servers.windows-mcp.env]
+ANONYMIZED_TELEMETRY = "false"
+```
+
+### Command Line (SSE/HTTP Transport)
+
+When running the server manually:
+
+<CodeGroup>
+```bash Windows
+set ANONYMIZED_TELEMETRY=false
+uvx windows-mcp --transport sse --host localhost --port 8000
+```
+
+```powershell PowerShell
+$env:ANONYMIZED_TELEMETRY = "false"
+uvx windows-mcp --transport sse --host localhost --port 8000
+```
+</CodeGroup>
+
+## Verifying Telemetry Status
+
+When telemetry is **enabled**, you'll see console output like:
+
+```
+[Analytics] Snapshot: SUCCESS (1234ms)
+[Analytics] Click: SUCCESS (567ms)
+[Analytics] Type: FAILED (890ms)
+```
+
+When telemetry is **disabled**, these messages will not appear, and no data will be sent to PostHog.
+
+## Data Retention and Processing
+
+Telemetry data is sent to PostHog's US cloud infrastructure:
+
+- **Host**: `https://us.i.posthog.com`
+- **API Key**: Public (visible in source code)
+- **GeoIP**: Disabled (IP addresses are not stored)
+- **Exception Autocapture**: Enabled (captures error context, not personal data)
+
+### Data Usage
+
+Collected data is used to:
+
+- Understand which tools are most frequently used
+- Identify which tools have higher failure rates
+- Measure performance metrics and latency
+- Prioritize bug fixes and improvements
+- Assess compatibility across different MCP clients
+
+### Data Sharing
+
+Analytics data is **NOT**:
+
+- Sold to third parties
+- Used for advertising
+- Shared with external organizations
+- Used to identify individual users
+
+## Feature Flags
+
+The analytics system also supports feature flags via PostHog. This allows the maintainers to:
+
+- Enable/disable experimental features remotely
+- Gradually roll out new tools
+- A/B test improvements
+
+Feature flags use the same anonymous user ID and respect the `ANONYMIZED_TELEMETRY=false` setting.
+
+## Local Data Processing
+
+<Check>
+**All tool execution happens locally on your machine.**
+
+Windows-MCP does NOT send:
+- Screenshots to remote servers
+- Commands to external services
+- UI state to the cloud
+- File contents anywhere
+</Check>
+
+The only network communication is:
+1. **Telemetry**: Optional anonymous metrics to PostHog (if enabled)
+2. **Web Scraping**: When using the `Scrape` tool (exposes browsing to target websites)
+3. **Remote Mode**: When configured with `MODE=remote` (proxy mode for windowsmcp.io)
+
+## Source Code Transparency
+
+The telemetry implementation is fully open source:
+
+- **Analytics module**: `src/windows_mcp/analytics.py` (192 lines)
+- **Decorator**: `@with_analytics` wrapper that instruments tools
+- **GitHub Repository**: [CursorTouch/Windows-MCP](https://github.com/CursorTouch/Windows-MCP)
+
+You can audit the code to verify privacy claims before using Windows-MCP in sensitive environments.
+
+## Questions and Concerns
+
+If you have questions about telemetry or data privacy:
+
+- **Email**: [jeogeoalukka@gmail.com](mailto:jeogeoalukka@gmail.com)
+- **Discord**: [Join the community](https://discord.com/invite/Aue9Yj2VzS)
+- **Twitter/X**: [@CursorTouch](https://x.com/CursorTouch)
+- **GitHub Issues**: [Report concerns](https://github.com/CursorTouch/Windows-MCP/issues)
+
+## Summary
+
+<CardGroup cols={2}>
+  <Card title="Collected" icon="check" color="#10b981">
+    - Tool names
+    - Success/failure status
+    - Execution duration
+    - Client name/version
+    - Anonymous session ID
+  </Card>
+  <Card title="NOT Collected" icon="xmark" color="#ef4444">
+    - Tool arguments
+    - Tool outputs
+    - Personal information
+    - IP addresses
+    - File contents
+  </Card>
+  <Card title="Privacy" icon="shield" color="#3b82f6">
+    - Random UUID only
+    - No personally identifiable information
+    - Local processing only
+    - Open source code
+  </Card>
+  <Card title="Disable" icon="toggle-off" color="#f59e0b">
+    Set environment variable:
+    `ANONYMIZED_TELEMETRY=false`
+  </Card>
+</CardGroup>

@@ -1,0 +1,177 @@
+---
+title: "Snapshot"
+description: "Capture desktop state, UI elements, and screenshots"
+---
+
+## Overview
+
+The Snapshot tool captures the complete desktop state including system language, focused/opened windows, interactive UI elements with coordinates, scrollable areas, and optional screenshots. This is the primary tool for understanding the current state of the Windows desktop before taking actions.
+
+<Info>Always call Snapshot first to understand the desktop state before using other automation tools.</Info>
+
+## Parameters
+
+<ParamField path="use_vision" type="bool" default="false">
+  Include a screenshot with cursor highlight in the response. Set to `true` to get visual feedback.
+</ParamField>
+
+<ParamField path="use_dom" type="bool" default="false">
+  Extract web page content from active browser instead of browser UI elements. Requires `use_ui_tree=true`.
+</ParamField>
+
+<ParamField path="use_annotation" type="bool" default="true">
+  Draw colored bounding boxes around detected UI elements on the screenshot. Set to `false` for clean screenshots.
+</ParamField>
+
+<ParamField path="use_ui_tree" type="bool" default="true">
+  Extract interactive and scrollable elements from the accessibility tree. Set to `false` for faster screenshot-only capture.
+</ParamField>
+
+<ParamField path="width_reference_line" type="int" optional>
+  Number of vertical grid lines to overlay on screenshot for spatial reasoning. Requires `use_vision=true`.
+</ParamField>
+
+<ParamField path="height_reference_line" type="int" optional>
+  Number of horizontal grid lines to overlay on screenshot. Requires `use_vision=true`.
+</ParamField>
+
+<ParamField path="display" type="list[int]" optional>
+  Limit snapshot to specific displays (e.g., `[0]` or `[0,1]`). Omit for full desktop capture.
+</ParamField>
+
+## Return Value
+
+Returns a structured text response containing:
+
+- **Cursor Position**: Current mouse coordinates
+- **Screenshot Resolution**: Image dimensions (capped at 1920x1080)
+- **Active Desktop**: Current virtual desktop information
+- **Focused Window**: Active window details
+- **Opened Windows**: List of all visible windows
+- **Interactive Elements**: Buttons, text fields, links with coordinates and label IDs
+- **Scrollable Elements**: Scrollable regions with coordinates
+- **Screenshot** (if `use_vision=true`): PNG image with optional annotations
+
+## Examples
+
+### Basic Desktop Snapshot
+
+```json
+{
+  "use_vision": false,
+  "use_ui_tree": true
+}
+```
+
+Returns text describing all windows and interactive elements without a screenshot.
+
+### Screenshot with UI Annotations
+
+```json
+{
+  "use_vision": true,
+  "use_annotation": true
+}
+```
+
+Returns screenshot with colored bounding boxes around all detected UI elements plus text listing.
+
+### Browser Content Extraction (DOM Mode)
+
+```json
+{
+  "use_vision": false,
+  "use_dom": true
+}
+```
+
+Extracts only web page content from the active browser tab, filtering out browser UI (address bar, tabs, toolbars).
+
+### Multi-Monitor Snapshot
+
+```json
+{
+  "use_vision": true,
+  "display": [0, 1]
+}
+```
+
+Captures both displays 0 and 1 in a single snapshot.
+
+### Screenshot with Reference Grid
+
+```json
+{
+  "use_vision": true,
+  "width_reference_line": 10,
+  "height_reference_line": 10
+}
+```
+
+Overlays a 10x10 grid on the screenshot for precise spatial reasoning.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Desktop State Inspection" icon="desktop">
+    Check which windows are open and what UI elements are visible before automation
+  </Card>
+  <Card title="Web Scraping" icon="globe">
+    Extract clean web page content using DOM mode
+  </Card>
+  <Card title="QA Testing" icon="check-circle">
+    Capture screenshots with annotations to verify UI state
+  </Card>
+  <Card title="Multi-Monitor Workflows" icon="display">
+    Target specific displays in multi-monitor setups
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Call Snapshot first">
+    Always start automation workflows with Snapshot to understand current desktop state
+  </Step>
+  <Step title="Use label IDs">
+    Reference interactive elements by their label ID (from Snapshot output) instead of hardcoded coordinates
+  </Step>
+  <Step title="Enable vision when needed">
+    Only enable `use_vision=true` when you need visual confirmation or spatial reasoning
+  </Step>
+  <Step title="Use DOM mode for browsers">
+    When automating browsers, use `use_dom=true` to get clean web content without browser UI
+  </Step>
+</Steps>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="use_dom=True requires use_ui_tree=True">
+    DOM mode needs UI tree extraction enabled. Remove `use_ui_tree=false` or omit it.
+  </Accordion>
+  <Accordion title="Error capturing desktop state">
+    Retry the Snapshot call. This can occur due to timing issues with window transitions.
+  </Accordion>
+  <Accordion title="No interactive elements found">
+    The active window may not expose accessibility information. Try switching to a different window.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Details
+
+- **Screenshot size**: Images are capped at 1920x1080 for token efficiency
+- **Coordinate space**: All coordinates use virtual desktop coordinates (multi-monitor aware)
+- **Browser detection**: Automatically detects Chrome, Edge, Firefox, and Arc for DOM mode
+- **Performance**: Fast mode (`use_ui_tree=false`) completes in ~100ms vs ~300ms for full extraction
+
+## Related Tools
+
+- [Click](/api/click) - Click on coordinates or label IDs from Snapshot
+- [Type](/api/type) - Enter text at locations identified by Snapshot
+- [Scroll](/api/scroll) - Scroll scrollable regions found by Snapshot
+- [Scrape](/api/scrape) - Alternative web scraping via HTTP requests
+
+## Implementation
+
+Source: `src/windows_mcp/__main__.py:179-280`

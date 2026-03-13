@@ -1,0 +1,608 @@
+---
+title: 'File Operations'
+description: 'Manage files and directories with the FileSystem tool'
+icon: 'folder-open'
+---
+
+## Overview
+
+The FileSystem tool provides comprehensive file and directory management capabilities through eight distinct operation modes. It offers a safer, more structured alternative to PowerShell commands for common file tasks.
+
+**Key benefits:**
+- Structured error handling
+- Relative path support (defaults to Desktop)
+- Built-in safety checks
+- Consistent return format
+- No PowerShell syntax required
+
+## FileSystem Modes
+
+The FileSystem tool operates in eight modes:
+
+<CardGroup cols={2}>
+  <Card title="read" icon="book-open">
+    Read text file contents with optional line offset/limit
+  </Card>
+  <Card title="write" icon="pen">
+    Create or overwrite files (set append=True to append)
+  </Card>
+  <Card title="copy" icon="copy">
+    Copy file or directory to destination
+  </Card>
+  <Card title="move" icon="arrows-left-right">
+    Move or rename file/directory
+  </Card>
+  <Card title="delete" icon="trash">
+    Delete file or directory (set recursive=True for non-empty dirs)
+  </Card>
+  <Card title="list" icon="list">
+    List directory contents with optional pattern filter
+  </Card>
+  <Card title="search" icon="magnifying-glass">
+    Find files matching a glob pattern
+  </Card>
+  <Card title="info" icon="circle-info">
+    Get file/directory metadata (size, dates, type)
+  </Card>
+</CardGroup>
+
+## Reading Files
+
+### Basic File Reading
+
+```python
+# Read entire file
+FileSystem(
+    mode='read',
+    path='document.txt'
+)
+```
+
+### Reading Specific Lines
+
+```python
+# Read lines 100-200
+FileSystem(
+    mode='read',
+    path='large_log.txt',
+    offset=100,  # Start at line 100 (1-based)
+    limit=100    # Read 100 lines
+)
+```
+
+### Reading with Different Encoding
+
+```python
+# Read file with specific encoding
+FileSystem(
+    mode='read',
+    path='data.csv',
+    encoding='utf-8'  # Default: 'utf-8'
+)
+```
+
+<Tip>
+**File size limit:** Files larger than 10MB require offset/limit parameters or PowerShell tool.
+</Tip>
+
+## Writing Files
+
+### Create New File
+
+```python
+# Create new file (overwrites if exists)
+FileSystem(
+    mode='write',
+    path='notes.txt',
+    content='Meeting notes from today...'
+)
+```
+
+### Append to Existing File
+
+```python
+# Append to file
+FileSystem(
+    mode='write',
+    path='log.txt',
+    content='New log entry\n',
+    append=True
+)
+```
+
+### Write with Encoding
+
+```python
+# Write with specific encoding
+FileSystem(
+    mode='write',
+    path='data.csv',
+    content='Name,Age\nJohn,30\n',
+    encoding='utf-8'
+)
+```
+
+<Note>
+**Parent directories:** FileSystem automatically creates parent directories if they don't exist.
+</Note>
+
+## Copying Files and Directories
+
+### Copy File
+
+```python
+# Copy single file
+FileSystem(
+    mode='copy',
+    path='report.pdf',
+    destination='backup/report_backup.pdf'
+)
+```
+
+### Copy Directory
+
+```python
+# Copy entire directory tree
+FileSystem(
+    mode='copy',
+    path='project_folder',
+    destination='backup/project_folder'
+)
+```
+
+### Copy with Overwrite
+
+```python
+# Overwrite existing destination
+FileSystem(
+    mode='copy',
+    path='data.xlsx',
+    destination='archive/data.xlsx',
+    overwrite=True
+)
+```
+
+<Warning>
+**Default behavior:** FileSystem will NOT overwrite existing files unless `overwrite=True` is set.
+</Warning>
+
+## Moving and Renaming
+
+### Move File
+
+```python
+# Move file to different directory
+FileSystem(
+    mode='move',
+    path='report.pdf',
+    destination='completed/report.pdf'
+)
+```
+
+### Rename File
+
+```python
+# Rename file (same directory)
+FileSystem(
+    mode='move',
+    path='old_name.txt',
+    destination='new_name.txt'
+)
+```
+
+### Move Directory
+
+```python
+# Move entire directory
+FileSystem(
+    mode='move',
+    path='temp_project',
+    destination='C:/Projects/archived_project'
+)
+```
+
+## Deleting Files and Directories
+
+### Delete File
+
+```python
+# Delete single file
+FileSystem(
+    mode='delete',
+    path='temp_file.txt'
+)
+```
+
+### Delete Empty Directory
+
+```python
+# Delete empty directory
+FileSystem(
+    mode='delete',
+    path='empty_folder'
+)
+```
+
+### Delete Directory with Contents
+
+```python
+# Delete directory and all contents
+FileSystem(
+    mode='delete',
+    path='old_project',
+    recursive=True  # Required for non-empty directories
+)
+```
+
+<Warning>
+**Recursive deletion:** Use `recursive=True` carefully - this permanently deletes all files and subdirectories without confirmation.
+</Warning>
+
+## Listing Directory Contents
+
+### Basic Directory Listing
+
+```python
+# List all files and folders
+FileSystem(
+    mode='list',
+    path='Documents'
+)
+```
+
+**Returns:** Formatted list with file names, types (File/Directory), and sizes.
+
+### Filtered Listing
+
+```python
+# List only PDF files
+FileSystem(
+    mode='list',
+    path='Documents',
+    pattern='*.pdf'
+)
+```
+
+### Recursive Listing
+
+```python
+# List all files in directory tree
+FileSystem(
+    mode='list',
+    path='Projects',
+    recursive=True
+)
+```
+
+### Include Hidden Files
+
+```python
+# Show hidden files (.files on Windows)
+FileSystem(
+    mode='list',
+    path='.',
+    show_hidden=True
+)
+```
+
+## Searching for Files
+
+### Search by Pattern
+
+```python
+# Find all .txt files
+FileSystem(
+    mode='search',
+    path='Documents',
+    pattern='*.txt',
+    recursive=True  # Default: True
+)
+```
+
+### Complex Search Patterns
+
+```python
+# Find all .jpg and .png images
+FileSystem(
+    mode='search',
+    path='Pictures',
+    pattern='*.{jpg,png}'
+)
+```
+
+### Non-Recursive Search
+
+```python
+# Search only immediate directory
+FileSystem(
+    mode='search',
+    path='Downloads',
+    pattern='*.exe',
+    recursive=False
+)
+```
+
+<Tip>
+**Search patterns:** Use glob syntax - `*` for any characters, `?` for single character, `**` for any directory level.
+</Tip>
+
+## Getting File Information
+
+### File Metadata
+
+```python
+# Get detailed file info
+FileSystem(
+    mode='info',
+    path='report.docx'
+)
+```
+
+**Returns:**
+- Path
+- Type (File/Directory/Symlink)
+- Size (formatted, e.g., "2.5 MB")
+- Created date
+- Modified date
+- Accessed date
+- Read-only status
+- File extension (for files)
+
+### Directory Metadata
+
+```python
+# Get directory info
+FileSystem(
+    mode='info',
+    path='Projects'
+)
+```
+
+**Returns:** Same as file info, plus:
+- Number of subdirectories
+- Number of files
+
+## Path Handling
+
+### Relative Paths
+
+By default, relative paths are resolved from the **user's Desktop folder**:
+
+```python
+# Refers to C:\Users\Username\Desktop\notes.txt
+FileSystem(mode='read', path='notes.txt')
+
+# Refers to C:\Users\Username\Desktop\Documents\report.pdf
+FileSystem(mode='read', path='Documents/report.pdf')
+```
+
+### Absolute Paths
+
+Use absolute paths to access any location:
+
+```python
+# Absolute path
+FileSystem(
+    mode='read',
+    path='C:/Projects/data.csv'
+)
+
+# Another absolute path
+FileSystem(
+    mode='list',
+    path='D:/Backups'
+)
+```
+
+<Note>
+**Path separators:** Windows-MCP accepts both forward slashes (`/`) and backslashes (`\\`) in paths.
+</Note>
+
+## Complete Workflow Examples
+
+### Example 1: Backup Important Files
+
+<Steps>
+  <Step title="Create backup directory">
+    ```python
+    # Create backup folder on Desktop
+    FileSystem(
+        mode='write',
+        path='Backup/.keep',
+        content=''  # Creates directory structure
+    )
+    ```
+  </Step>
+
+  <Step title="Find files to backup">
+    ```python
+    # Search for all .docx files
+    files = FileSystem(
+        mode='search',
+        path='Documents',
+        pattern='*.docx',
+        recursive=True
+    )
+    ```
+  </Step>
+
+  <Step title="Copy files to backup">
+    ```python
+    # Copy each file (example for one file)
+    FileSystem(
+        mode='copy',
+        path='Documents/report.docx',
+        destination='Backup/report.docx',
+        overwrite=True
+    )
+    ```
+  </Step>
+
+  <Step title="Verify backup">
+    ```python
+    # List backup contents
+    FileSystem(
+        mode='list',
+        path='Backup',
+        recursive=True
+    )
+    ```
+  </Step>
+</Steps>
+
+### Example 2: Log Processing
+
+```python
+# Read last 100 lines of log
+last_entries = FileSystem(
+    mode='read',
+    path='C:/Logs/application.log',
+    offset=-100,  # Last 100 lines
+    limit=100
+)
+
+# Process entries...
+# Then append summary
+FileSystem(
+    mode='write',
+    path='C:/Logs/summary.txt',
+    content=f'Log analysis: {summary}\n',
+    append=True
+)
+```
+
+### Example 3: Project Organization
+
+```python
+# Get info about project folder
+project_info = FileSystem(
+    mode='info',
+    path='C:/Projects/MyApp'
+)
+
+# Find all Python files
+python_files = FileSystem(
+    mode='search',
+    path='C:/Projects/MyApp',
+    pattern='*.py',
+    recursive=True
+)
+
+# Archive old versions
+FileSystem(
+    mode='move',
+    path='C:/Projects/MyApp/old_version',
+    destination='C:/Archive/MyApp_v1'
+)
+```
+
+### Example 4: Data Export
+
+```python
+# Generate CSV data
+csv_content = '''Name,Email,Status
+John Doe,john@example.com,Active
+Jane Smith,jane@example.com,Active
+'''
+
+# Write to Desktop
+FileSystem(
+    mode='write',
+    path='export_data.csv',
+    content=csv_content
+)
+
+# Copy to shared folder
+FileSystem(
+    mode='copy',
+    path='export_data.csv',
+    destination='C:/Shared/export_data.csv',
+    overwrite=True
+)
+
+# Send notification
+Notification(
+    title='Export Complete',
+    message='Data exported to Shared folder'
+)
+```
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="File not found">
+    **Error:** `Error: File not found: path`
+    
+    **Causes:**
+    - Incorrect path
+    - File deleted or moved
+    - Permission issues
+    
+    **Solutions:**
+    - Verify path with `list` mode
+    - Check if path is relative or absolute
+    - Use `info` mode to check file existence
+  </Accordion>
+
+  <Accordion title="Permission denied">
+    **Error:** `Error: Permission denied: path`
+    
+    **Causes:**
+    - File is in use by another program
+    - Insufficient permissions
+    - File is read-only
+    
+    **Solutions:**
+    - Close programs using the file
+    - Run with administrator privileges
+    - Check file properties (read-only flag)
+  </Accordion>
+
+  <Accordion title="Destination already exists">
+    **Error:** `Error: Destination already exists`
+    
+    **Causes:**
+    - Copying/moving to existing file without overwrite flag
+    
+    **Solutions:**
+    - Add `overwrite=True` parameter
+    - Choose different destination
+    - Delete existing file first
+  </Accordion>
+
+  <Accordion title="Directory not empty">
+    **Error:** `Error: Directory is not empty. Set recursive=True`
+    
+    **Causes:**
+    - Attempting to delete non-empty directory without recursive flag
+    
+    **Solutions:**
+    - Add `recursive=True` parameter
+    - Delete contents manually first
+    - Use `list` to check directory contents
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+**Use absolute paths for critical operations:** Reduces ambiguity and prevents errors from unexpected working directory changes.
+</Tip>
+
+<Tip>
+**Check before deleting:** Use `info` or `list` mode to verify what will be deleted before running recursive delete operations.
+</Tip>
+
+<Tip>
+**Handle large files carefully:** For files over 10MB, use offset/limit parameters or consider PowerShell tool with streaming.
+</Tip>
+
+<Warning>
+**Binary files:** The `read` mode is designed for text files. Binary files will return encoding errors or garbled output.
+</Warning>
+
+## Related Tools
+
+- [PowerShell](/api/shell) - For complex file operations and scripting
+- [Clipboard](/api/clipboard) - Copy file paths or content to clipboard
+- [Notification](/api/notification) - Alert user when file operations complete

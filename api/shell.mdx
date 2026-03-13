@@ -1,0 +1,306 @@
+---
+title: PowerShell
+description: Execute PowerShell commands for system automation and scripting
+---
+
+The **PowerShell** tool executes arbitrary PowerShell commands, providing full access to Windows system capabilities. It's the primary interface for system automation, file management, process control, network operations, and administrative tasks.
+
+## Overview
+
+Use the PowerShell tool for:
+- File system navigation and manipulation
+- Process and service management
+- Network operations and web requests
+- Registry access
+- System configuration
+- Complex scripting and automation
+
+<Warning>
+  This tool has **full system access** with no sandboxing. Commands can perform irreversible operations. Use with caution, especially with commands like `Remove-Item`, `Stop-Process`, or registry modifications.
+</Warning>
+
+## Parameters
+
+<ParamField path="command" type="string" required>
+  The PowerShell command or script to execute. Can be a single cmdlet, a pipeline, or a multi-line script. Supports all PowerShell 5.1+ and PowerShell 7+ syntax.
+</ParamField>
+
+<ParamField path="timeout" type="integer" default={30}>
+  Maximum execution time in seconds. If the command runs longer than this, it will be terminated and return a timeout error. Range: 1-300 seconds.
+</ParamField>
+
+## Return Value
+
+Returns a string with two sections:
+
+```
+Response: <stdout or stderr output>
+Status Code: <0 for success, 1 for error>
+```
+
+**Status Codes:**
+- `0`: Command completed successfully
+- `1`: Command failed, timed out, or threw an exception
+
+## Examples
+
+### File Operations
+
+List directory contents:
+```json
+{
+  "command": "Get-ChildItem C:\\Users\\Public -Name",
+  "timeout": 10
+}
+```
+
+Return:
+```
+Response: Desktop
+Documents
+Downloads
+Music
+Pictures
+Videos
+Status Code: 0
+```
+
+Read file contents:
+```json
+{
+  "command": "Get-Content C:\\temp\\notes.txt"
+}
+```
+
+Create a file:
+```json
+{
+  "command": "Set-Content -Path C:\\temp\\test.txt -Value 'Hello World'"
+}
+```
+
+Copy files with wildcard:
+```json
+{
+  "command": "Copy-Item C:\\source\\*.txt C:\\destination\\"
+}
+```
+
+### Process Management
+
+List running processes:
+```json
+{
+  "command": "Get-Process | Where-Object {$_.CPU -gt 10} | Select-Object Name,CPU,WorkingSet | Format-Table"
+}
+```
+
+Start a process:
+```json
+{
+  "command": "Start-Process notepad.exe"
+}
+```
+
+Stop a process:
+```json
+{
+  "command": "Stop-Process -Name chrome -Force"
+}
+```
+
+### Network Operations
+
+Download a file:
+```json
+{
+  "command": "Invoke-WebRequest -Uri 'https://example.com/file.zip' -OutFile C:\\downloads\\file.zip",
+  "timeout": 60
+}
+```
+
+Test network connectivity:
+```json
+{
+  "command": "Test-NetConnection google.com -Port 443"
+}
+```
+
+Get IP configuration:
+```json
+{
+  "command": "Get-NetIPAddress | Where-Object {$_.AddressFamily -eq 'IPv4'} | Format-Table"
+}
+```
+
+### System Information
+
+Get OS version:
+```json
+{
+  "command": "(Get-CimInstance Win32_OperatingSystem).Caption"
+}
+```
+
+Check disk space:
+```json
+{
+  "command": "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Used,Free | Format-Table"
+}
+```
+
+List installed programs:
+```json
+{
+  "command": "Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Select-Object DisplayName,DisplayVersion"
+}
+```
+
+### Service Management
+
+Get service status:
+```json
+{
+  "command": "Get-Service -Name wuauserv"
+}
+```
+
+Restart a service (requires admin):
+```json
+{
+  "command": "Restart-Service -Name wuauserv"
+}
+```
+
+### Environment Variables
+
+Get environment variable:
+```json
+{
+  "command": "$env:PATH"
+}
+```
+
+Set environment variable (session-scoped):
+```json
+{
+  "command": "$env:MY_VAR = 'Hello'"
+}
+```
+
+## Error Handling
+
+Errors are returned in the Response field with Status Code 1:
+
+**Command not found:**
+```
+Response: Get-FakeCommand : The term 'Get-FakeCommand' is not recognized...
+Status Code: 1
+```
+
+**Access denied:**
+```
+Response: Stop-Service : Access denied.
+Status Code: 1
+```
+
+**Timeout:**
+```
+Response: Command execution timed out
+Status Code: 1
+```
+
+**Exception:**
+```
+Response: Command execution failed: FileNotFoundException: Could not find file
+Status Code: 1
+```
+
+## Implementation Details
+
+**Source Files:**
+- Tool definition: `src/windows_mcp/__main__.py:89-106`
+- Implementation: `src/windows_mcp/desktop/service.py:277-343`
+
+**Execution Flow:**
+1. Command is wrapped with UTF-8 encoding setup:
+   ```powershell
+   $OutputEncoding = [System.Text.Encoding]::UTF8;
+   [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
+   <your command>
+   ```
+2. Command is base64-encoded to avoid escaping issues
+3. Executed via `powershell.exe` (PS 5.1) or `pwsh.exe` (PS 7+) with `-EncodedCommand`
+4. PATH and PATHEXT are rebuilt from registry to ensure system executables are discoverable
+5. Subprocess runs with user's home directory as working directory
+6. Output captured with UTF-8 decoding (with error replacement)
+
+**PowerShell Version Selection:**
+- Uses `pwsh.exe` (PowerShell 7+) if available
+- Falls back to `powershell.exe` (PowerShell 5.1) if `pwsh` not found
+- PowerShell 5.1 uses `-OutputFormat Text` for better compatibility
+
+**Environment:**
+- Working directory: User's home directory (`~`)
+- PATH: Rebuilt from registry (HKLM and HKCU Environment keys)
+- PATHEXT: Rebuilt from registry if not present
+- No profile loaded (`-NoProfile` flag)
+
+## Security Considerations
+
+1. **Full system access**: This tool can execute any command with the user's privileges. There are no restrictions.
+
+2. **Irreversible operations**: Commands like `Remove-Item -Recurse`, `Format-Volume`, or `Stop-Process` cannot be undone.
+
+3. **Network access**: Can make outbound connections, download files, and interact with network resources.
+
+4. **Registry access**: Can read and modify registry keys (with appropriate permissions).
+
+5. **Privilege escalation**: Cannot elevate to administrator without UAC prompt, but can perform any action the current user is authorized for.
+
+**Recommended deployment**: Use in a VM, Windows Sandbox, or isolated environment when testing or working with untrusted commands.
+
+## Best Practices
+
+1. **Use specific cmdlets**: Prefer `Get-ChildItem` over `dir`, `Remove-Item` over `del`
+
+2. **Handle paths with spaces**: Use quotes:
+   ```powershell
+   Get-Content "C:\\Program Files\\myfile.txt"
+   ```
+
+3. **Format output for readability**: Use `Format-Table`, `Format-List`, or `ConvertTo-Json`:
+   ```powershell
+   Get-Process | Select-Object Name,CPU | ConvertTo-Json
+   ```
+
+4. **Check for errors**: Use `-ErrorAction Stop` to ensure errors are caught:
+   ```powershell
+   Remove-Item C:\\temp\\file.txt -ErrorAction Stop
+   ```
+
+5. **Increase timeout for long operations**: File downloads, large searches, or network operations may need 60+ second timeouts
+
+6. **Test destructive commands**: Use `-WhatIf` to preview:
+   ```powershell
+   Remove-Item C:\\temp\\* -Recurse -WhatIf
+   ```
+
+## Limitations
+
+1. **No interactive input**: Commands requiring user input (like `Read-Host`) will hang until timeout
+
+2. **No persistent state**: Each command runs in a fresh PowerShell session. Variables and functions don't persist between calls
+
+3. **Output size**: Very large output may be truncated or slow to return. Consider filtering with `Select-Object -First` or redirecting to a file
+
+4. **Admin operations**: Commands requiring elevation will fail unless the MCP server itself runs as administrator
+
+5. **GUI applications**: Launching GUI apps with `Start-Process` works, but you cannot interact with them via this tool (use App, Click, Type tools instead)
+
+## Related Tools
+
+- **[FileSystem](/api/filesystem)**: Structured alternative for common file operations (read, write, copy, move, delete)
+- **[Registry](/api/registry)**: Specialized tool for registry operations
+- **[Process](/api/process)**: Simplified interface for listing and killing processes
+- **[App](/api/app)**: Launch applications by name

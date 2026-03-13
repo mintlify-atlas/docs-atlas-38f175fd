@@ -1,0 +1,214 @@
+---
+title: "Wait"
+description: "Pause execution for specified duration"
+---
+
+## Overview
+
+The Wait tool pauses execution for a specified duration in seconds. Essential for allowing applications to launch, UI animations to complete, content to load, and dialogs to appear before the next automation action.
+
+## Parameters
+
+<ParamField path="duration" type="int" required>
+  Number of seconds to wait. Must be a positive integer.
+</ParamField>
+
+## Return Value
+
+Returns a success message confirming the wait duration.
+
+Example: `"Waited for 3 seconds."`
+
+## Examples
+
+### Wait for Application Launch
+
+```json
+{
+  "duration": 2
+}
+```
+
+Waits 2 seconds for an application to fully launch before interacting with it.
+
+### Wait for Page Load
+
+```json
+{
+  "duration": 3
+}
+```
+
+Waits 3 seconds for a web page to load after navigation.
+
+### Wait for Dialog
+
+```json
+{
+  "duration": 1
+}
+```
+
+Waits 1 second for a dialog or popup to appear.
+
+### Wait for Animation
+
+```json
+{
+  "duration": 1
+}
+```
+
+Waits for UI animations and transitions to complete.
+
+## When to Use Wait
+
+<CardGroup cols={2}>
+  <Card title="Application Launch" icon="rocket">
+    Wait 2-5 seconds after launching apps for windows to appear
+  </Card>
+  <Card title="Page Loading" icon="spinner">
+    Wait 2-4 seconds after navigation for content to load
+  </Card>
+  <Card title="Dialog Appearance" icon="window-maximize">
+    Wait 1-2 seconds for dialogs and popups to render
+  </Card>
+  <Card title="UI Updates" icon="arrows-rotate">
+    Wait 0.5-1 seconds after clicks for UI state changes
+  </Card>
+  <Card title="File Operations" icon="file">
+    Wait 1-2 seconds after saving/creating files
+  </Card>
+  <Card title="Network Requests" icon="cloud">
+    Wait 2-5 seconds for API calls and data fetching
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Wait after App tool">
+    Always wait 2-3 seconds after launching applications
+  </Step>
+  <Step title="Wait after navigation">
+    Add 2-3 seconds after clicking links or buttons that load new content
+  </Step>
+  <Step title="Wait before verification">
+    Use Wait before Snapshot to ensure UI is stable
+  </Step>
+  <Step title="Adjust based on system">
+    Slower systems may need longer wait times
+  </Step>
+</Steps>
+
+<Tip>
+Use shorter waits (1-2s) for simple UI updates and longer waits (3-5s) for application launches and page loads.
+</Tip>
+
+## Common Wait Patterns
+
+<Tabs>
+  <Tab title="Launch App">
+    ```json
+    [
+      {"tool": "App", "mode": "launch", "name": "notepad"},
+      {"tool": "Wait", "duration": 2},
+      {"tool": "Snapshot"}
+    ]
+    ```
+    Launch app, wait for it to appear, then verify with Snapshot.
+  </Tab>
+  
+  <Tab title="Click and Wait">
+    ```json
+    [
+      {"tool": "Click", "loc": [500, 300]},
+      {"tool": "Wait", "duration": 1},
+      {"tool": "Snapshot"}
+    ]
+    ```
+    Click button, wait for action to complete, verify result.
+  </Tab>
+  
+  <Tab title="Type and Submit">
+    ```json
+    [
+      {"tool": "Type", "text": "search query", "press_enter": true},
+      {"tool": "Wait", "duration": 3},
+      {"tool": "Snapshot"}
+    ]
+    ```
+    Submit form, wait for results to load, capture results.
+  </Tab>
+</Tabs>
+
+## Determining Wait Duration
+
+<AccordionGroup>
+  <Accordion title="Application Launch (2-5 seconds)">
+    - Small apps (Notepad, Calculator): 2 seconds
+    - Medium apps (File Explorer, Settings): 3 seconds
+    - Large apps (Office, Browsers): 4-5 seconds
+  </Accordion>
+  
+  <Accordion title="Web Page Loading (2-4 seconds)">
+    - Static pages: 2 seconds
+    - Dynamic content: 3 seconds
+    - Heavy JavaScript apps: 4 seconds
+  </Accordion>
+  
+  <Accordion title="UI Interactions (0.5-2 seconds)">
+    - Simple clicks: 0.5-1 seconds
+    - Menu expansion: 1 second
+    - Form submission: 2 seconds
+  </Accordion>
+  
+  <Accordion title="File Operations (1-3 seconds)">
+    - Small files: 1 second
+    - Medium files: 2 seconds
+    - Large files or network: 3+ seconds
+  </Accordion>
+</AccordionGroup>
+
+## Alternatives to Fixed Waits
+
+<Warning>
+Fixed waits are simple but not always optimal. For more reliable automation, use verification-based waiting.
+</Warning>
+
+Instead of:
+```json
+{"tool": "Wait", "duration": 5}
+```
+
+Consider:
+```json
+[
+  {"tool": "Wait", "duration": 2},
+  {"tool": "Snapshot"},
+  // Check if expected element appeared
+  // If not, wait again and retry
+]
+```
+
+## Technical Details
+
+- **Precision**: Waits are accurate to within ~10ms
+- **Blocking**: Wait blocks all other operations during the duration
+- **Implementation**: Uses Python's `time.sleep()` function
+- **Thread safety**: Does not interfere with the WatchDog service thread
+
+<Info>
+Wait does not consume significant system resources - it simply pauses execution.
+</Info>
+
+## Related Tools
+
+- [Snapshot](/api/snapshot) - Verify UI state after waiting
+- [App](/api/app) - Launch apps that require wait time
+- [Click](/api/click) - Click actions that trigger waits
+- [Type](/api/type) - Text input followed by UI updates
+
+## Implementation
+
+Source: `src/windows_mcp/__main__.py:466-480`

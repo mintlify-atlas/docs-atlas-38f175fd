@@ -1,0 +1,193 @@
+---
+title: App
+description: Launch, switch, and resize applications and windows
+---
+
+The **App** tool manages Windows applications and windows. It provides three modes for opening applications, switching focus between windows, and resizing/repositioning windows.
+
+## Overview
+
+Use the App tool to:
+- Launch applications from the Start Menu
+- Switch focus to specific windows
+- Resize and reposition windows
+
+## Parameters
+
+<ParamField path="mode" type="Literal['launch', 'resize', 'switch']" required default="launch">
+  Operation mode:
+  - `launch`: Opens/starts the specified application
+  - `resize`: Adjusts the size and/or position of a window
+  - `switch`: Brings a specific window into focus (foreground)
+</ParamField>
+
+<ParamField path="name" type="string" required={false}>
+  Application or window name. Required for `launch` and `switch` modes. Optional for `resize` mode (if omitted, resizes the active window). Uses fuzzy matching to find applications in the Start Menu or open windows.
+</ParamField>
+
+<ParamField path="window_loc" type="list[int]" required={false}>
+  Window position as `[x, y]` coordinates in pixels. Only used in `resize` mode. If omitted, window position remains unchanged.
+</ParamField>
+
+<ParamField path="window_size" type="list[int]" required={false}>
+  Window size as `[width, height]` in pixels. Only used in `resize` mode. If omitted, window size remains unchanged.
+</ParamField>
+
+## Mode Details
+
+### Launch Mode
+
+Launches an application by searching the Windows Start Menu. Uses fuzzy matching with a 70% confidence threshold.
+
+**Behavior:**
+- Searches installed apps using `Get-StartApps` (Windows 10+)
+- Falls back to scanning Start Menu `.lnk` shortcuts on older systems
+- Returns immediately after sending the launch command
+- Waits up to 10 seconds for the window to appear before confirming success
+- Supports both traditional desktop apps and UWP apps
+
+**Required Parameters:**
+- `name`: Application name (e.g., "notepad", "chrome", "excel")
+
+**Example:**
+```json
+{
+  "mode": "launch",
+  "name": "notepad"
+}
+```
+
+**Return Value:**
+- Success: `"Notepad launched."`
+- Not found: `"Notepad not found in start menu."`
+- Timeout: `"Launching Notepad sent, but window not detected yet."`
+
+### Resize Mode
+
+Resizes and/or repositions a window. Can target a named window or the currently active window.
+
+**Behavior:**
+- If `name` is provided, searches for matching window (70% fuzzy match threshold)
+- If `name` is omitted, operates on the active window
+- Cannot resize minimized or maximized windows (returns error)
+- If `window_loc` is omitted, window position is preserved
+- If `window_size` is omitted, window size is preserved
+
+**Parameters:**
+- `name` (optional): Window name to resize
+- `window_loc` (optional): New position `[x, y]`
+- `window_size` (optional): New size `[width, height]`
+
+**Examples:**
+
+Resize active window to 800x600:
+```json
+{
+  "mode": "resize",
+  "window_size": [800, 600]
+}
+```
+
+Move and resize Notepad:
+```json
+{
+  "mode": "resize",
+  "name": "notepad",
+  "window_loc": [100, 100],
+  "window_size": [1024, 768]
+}
+```
+
+Move window without resizing:
+```json
+{
+  "mode": "resize",
+  "name": "chrome",
+  "window_loc": [0, 0]
+}
+```
+
+**Return Values:**
+- Success: `"Notepad resized to 800x600 at 100,100."`
+- No active window: `"No active window found"`
+- Window minimized: `"Notepad is minimized"`
+- Window maximized: `"Notepad is maximized"`
+- Window not found: `"Application chrome not found."`
+
+### Switch Mode
+
+Brings a specific window to the foreground and gives it focus.
+
+**Behavior:**
+- Searches open windows using fuzzy matching (70% threshold)
+- If window is minimized, restores it before switching
+- Attaches thread input to ensure reliable focus transfer
+- Refreshes desktop state to find current windows
+
+**Required Parameters:**
+- `name`: Window name to switch to
+
+**Example:**
+```json
+{
+  "mode": "switch",
+  "name": "chrome"
+}
+```
+
+**Return Values:**
+- Success: `"Switched to Chrome window."`
+- From minimized: `"Restored Chrome from minimized and switched to it."`
+- Not found: `"Application chrome not found."`
+- No windows: `"No windows found on the desktop."`
+
+## Error Handling
+
+Common errors and their meanings:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `"Application X not found in start menu"` | App name doesn't match any installed application | Check spelling or use a more common app name (e.g., "notepad" instead of "Notepad++") |
+| `"Application X not found"` | No open window matches the name (switch/resize) | Verify window is open and try a different name variant |
+| `"No active window found"` | Attempting to resize without name when no window is focused | Provide a window name or focus a window first |
+| `"X is minimized/maximized"` | Cannot resize a non-normal window | Restore window to normal state first |
+| `"No windows found on the desktop"` | Desktop state is empty | Wait a moment and try again |
+
+## Implementation Details
+
+**Source Files:**
+- Tool definition: `src/windows_mcp/__main__.py:74-87`
+- Implementation: `src/windows_mcp/desktop/service.py:425-467`
+- Launch logic: `src/windows_mcp/desktop/service.py:468-496`
+- Switch logic: `src/windows_mcp/desktop/service.py:498-514`
+- Resize logic: `src/windows_mcp/desktop/service.py:386-418`
+
+**Key Methods:**
+- `Desktop.app()`: Main dispatcher
+- `Desktop.launch_app()`: Uses PowerShell `Start-Process` with app ID
+- `Desktop.switch_app()`: Uses Win32 `SetForegroundWindow` with thread attachment
+- `Desktop.resize_app()`: Uses UIAutomation `MoveWindow`
+- `Desktop._find_window_by_name()`: Fuzzy matching via `fuzzywuzzy`
+
+**Dependencies:**
+- UIAutomation for window control (`comtypes`)
+- `fuzzywuzzy` for fuzzy string matching
+- PowerShell for app launching and discovery
+
+## Usage Tips
+
+1. **Fuzzy matching is forgiving**: You don't need exact names. "note" will match "Notepad", "chrome" matches "Google Chrome".
+
+2. **Launch waits briefly**: The tool waits up to 10 seconds for a window to appear after launch. If the app takes longer, the tool returns early but the app continues launching.
+
+3. **Switch from minimized**: The switch mode automatically restores minimized windows.
+
+4. **Resize requires normal state**: You cannot resize a maximized or minimized window. Use the Shortcut tool to restore first (e.g., `Win+Down` to restore from maximized).
+
+5. **Coordinates are screen-relative**: Use the Snapshot tool to understand current screen dimensions and window positions.
+
+## Related Tools
+
+- **[Snapshot](/api/snapshot)**: Inspect current windows and their positions
+- **[Shortcut](/api/shortcut)**: Use keyboard shortcuts for window management (e.g., `Win+Up` to maximize)
+- **[Click](/api/click)**: Interact with window controls like minimize/maximize buttons

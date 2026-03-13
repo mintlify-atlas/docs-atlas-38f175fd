@@ -1,0 +1,249 @@
+---
+title: "Shortcut"
+description: "Execute keyboard shortcuts (Ctrl+C, Alt+Tab, etc.)"
+---
+
+## Overview
+
+The Shortcut tool executes keyboard shortcuts using key combinations separated by `+`. Supports modifier keys (Ctrl, Alt, Shift, Win) and special keys for quick actions and system commands.
+
+## Parameters
+
+<ParamField path="shortcut" type="string" required>
+  Keyboard shortcut string with keys separated by `+`. Case-insensitive.
+  
+  Examples: `"ctrl+c"`, `"alt+tab"`, `"win+r"`, `"ctrl+shift+esc"`
+</ParamField>
+
+## Return Value
+
+Returns a success message confirming the shortcut was pressed.
+
+Example: `"Pressed ctrl+c."`
+
+## Supported Keys
+
+### Modifier Keys
+- `ctrl` - Control key
+- `alt` - Alt key
+- `shift` - Shift key
+- `win` - Windows key
+
+### Special Keys
+- `enter`, `return` - Enter key
+- `tab` - Tab key
+- `esc`, `escape` - Escape key
+- `space` - Space bar
+- `backspace` - Backspace key
+- `delete` - Delete key
+- Arrow keys: `up`, `down`, `left`, `right`
+- Function keys: `f1` through `f12`
+- `home`, `end`, `pageup`, `pagedown`
+
+### Regular Keys
+- Letters: `a-z`
+- Numbers: `0-9`
+- Punctuation: Most standard keyboard symbols
+
+## Examples
+
+### Copy Text
+
+```json
+{
+  "shortcut": "ctrl+c"
+}
+```
+
+Copies selected text to clipboard.
+
+### Paste Text
+
+```json
+{
+  "shortcut": "ctrl+v"
+}
+```
+
+Pastes clipboard content at cursor position.
+
+### Switch Applications
+
+```json
+{
+  "shortcut": "alt+tab"
+}
+```
+
+Cycles to the next open application window.
+
+### Open Run Dialog
+
+```json
+{
+  "shortcut": "win+r"
+}
+```
+
+Opens the Windows Run dialog for launching applications.
+
+### Open Task Manager
+
+```json
+{
+  "shortcut": "ctrl+shift+esc"
+}
+```
+
+Directly opens Windows Task Manager.
+
+### Select All
+
+```json
+{
+  "shortcut": "ctrl+a"
+}
+```
+
+Selects all content in the active window.
+
+### Undo
+
+```json
+{
+  "shortcut": "ctrl+z"
+}
+```
+
+Undoes the last action.
+
+### Save File
+
+```json
+{
+  "shortcut": "ctrl+s"
+}
+```
+
+Saves the current document or file.
+
+### Open Start Menu
+
+```json
+{
+  "shortcut": "win"
+}
+```
+
+Opens the Windows Start menu (single key, no combination).
+
+## Common Shortcuts
+
+<AccordionGroup>
+  <Accordion title="File Operations">
+    - `ctrl+n` - New file/window
+    - `ctrl+o` - Open file
+    - `ctrl+s` - Save file
+    - `ctrl+shift+s` - Save as
+    - `ctrl+p` - Print
+    - `ctrl+w` - Close window/tab
+  </Accordion>
+  
+  <Accordion title="Editing">
+    - `ctrl+x` - Cut
+    - `ctrl+c` - Copy
+    - `ctrl+v` - Paste
+    - `ctrl+z` - Undo
+    - `ctrl+y` - Redo
+    - `ctrl+a` - Select all
+    - `ctrl+f` - Find
+  </Accordion>
+  
+  <Accordion title="Window Management">
+    - `alt+tab` - Switch windows
+    - `alt+f4` - Close window
+    - `win+d` - Show desktop
+    - `win+m` - Minimize all
+    - `win+left` - Snap window left
+    - `win+right` - Snap window right
+  </Accordion>
+  
+  <Accordion title="System">
+    - `ctrl+shift+esc` - Task Manager
+    - `win+r` - Run dialog
+    - `win+e` - File Explorer
+    - `win+i` - Settings
+    - `win+l` - Lock screen
+    - `ctrl+alt+delete` - Security options
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Text Operations" icon="scissors">
+    Copy, cut, paste, and select text without using menus
+  </Card>
+  <Card title="Window Switching" icon="window-restore">
+    Navigate between applications and arrange windows
+  </Card>
+  <Card title="System Commands" icon="gear">
+    Access system tools and dialogs quickly
+  </Card>
+  <Card title="Application Commands" icon="keyboard">
+    Execute app-specific shortcuts for efficient workflows
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use shortcuts for repetitive actions">
+    Shortcuts are faster than clicking through menus for common operations
+  </Step>
+  <Step title="Add Wait after shortcuts">
+    Some shortcuts trigger dialogs or actions that take time to complete
+  </Step>
+  <Step title="Verify active window">
+    Use Snapshot to ensure the correct window is focused before sending shortcuts
+  </Step>
+  <Step title="Handle application-specific shortcuts">
+    Different apps may have custom shortcuts - consult app documentation
+  </Step>
+</Steps>
+
+<Tip>
+Combine Shortcut with Type for efficient text manipulation: select all with Ctrl+A, then Type new content.
+</Tip>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Shortcut not recognized">
+    Check the key names match the supported keys list. Use lowercase and separate with `+`.
+  </Accordion>
+  <Accordion title="Shortcut has no effect">
+    The active application may not support this shortcut, or wrong window is focused.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Details
+
+- **Key press timing**: ~50ms delay between key down and key up events
+- **Modifier handling**: Modifiers are pressed in order, then released in reverse
+- **Implementation**: Uses Windows SendInput API for keyboard simulation
+- **Special handling**: Alt+Tab requires special timing for reliable window switching
+
+<Warning>
+Some shortcuts like Ctrl+Alt+Delete may be intercepted by the system and cannot be simulated.
+</Warning>
+
+## Related Tools
+
+- [Type](/api/type) - Type longer text content instead of single keys
+- [App](/api/app) - Switch windows without Alt+Tab
+- [Clipboard](/api/clipboard) - Read/write clipboard for copy/paste workflows
+
+## Implementation
+
+Source: `src/windows_mcp/__main__.py:449-463`

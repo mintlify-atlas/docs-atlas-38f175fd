@@ -1,0 +1,189 @@
+---
+title: Transport Options
+description: Configure Windows-MCP to use different transport layers including stdio, SSE, and streamable-http
+---
+
+Windows-MCP supports three transport layers for communication between the MCP client and server. Choose the appropriate transport based on your deployment scenario.
+
+## Transport Types
+
+Windows-MCP supports the following transport options:
+
+<CardGroup cols={3}>
+  <Card title="stdio" icon="terminal">
+    Default transport for direct local connections from MCP clients
+  </Card>
+  <Card title="SSE" icon="broadcast-tower">
+    Server-Sent Events for network-accessible connections
+  </Card>
+  <Card title="streamable-http" icon="globe">
+    HTTP streaming transport recommended for production deployments
+  </Card>
+</CardGroup>
+
+## stdio (Default)
+
+**Use Case:** Direct connection from MCP clients like Claude Desktop, Cursor, Perplexity, etc.
+
+This is the default transport and requires no additional configuration. The MCP client communicates with the server via standard input/output streams.
+
+### Configuration
+
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": [
+        "windows-mcp"
+      ]
+    }
+  }
+}
+```
+
+### Command Line
+
+```bash
+# Runs with stdio transport (default)
+uvx windows-mcp
+
+# Explicitly specify stdio transport
+uvx windows-mcp --transport stdio
+```
+
+<Note>
+stdio transport does not require `--host` or `--port` parameters as it uses standard input/output streams.
+</Note>
+
+## SSE (Server-Sent Events)
+
+**Use Case:** Network-accessible connections via Server-Sent Events for real-time updates.
+
+SSE enables the server to push updates to clients over HTTP. This transport is useful when you need network access but want a simpler setup than full HTTP streaming.
+
+### Configuration
+
+To run Windows-MCP with SSE transport:
+
+```bash
+uvx windows-mcp --transport sse --host localhost --port 8000
+```
+
+### Parameters
+
+| Parameter | Description | Default | Required |
+|-----------|-------------|---------|----------|
+| `--transport` | Transport type | `stdio` | Yes |
+| `--host` | Host to bind the server | `localhost` | Yes |
+| `--port` | Port to bind the server | `8000` | Yes |
+
+### Example
+
+```bash
+# Run on localhost:8000
+uvx windows-mcp --transport sse --host localhost --port 8000
+
+# Run on all interfaces on port 3000
+uvx windows-mcp --transport sse --host 0.0.0.0 --port 3000
+```
+
+## streamable-http
+
+**Use Case:** Network-accessible connections via HTTP streaming. **Recommended for production deployments.**
+
+Streamable HTTP provides a robust transport layer for production environments, supporting HTTP streaming for efficient data transfer.
+
+### Configuration
+
+To run Windows-MCP with streamable-http transport:
+
+```bash
+uvx windows-mcp --transport streamable-http --host localhost --port 8000
+```
+
+### Parameters
+
+| Parameter | Description | Default | Required |
+|-----------|-------------|---------|----------|
+| `--transport` | Transport type | `stdio` | Yes |
+| `--host` | Host to bind the server | `localhost` | Yes |
+| `--port` | Port to bind the server | `8000` | Yes |
+
+### Example
+
+```bash
+# Run on localhost:8000
+uvx windows-mcp --transport streamable-http --host localhost --port 8000
+
+# Run on all interfaces on port 5000
+uvx windows-mcp --transport streamable-http --host 0.0.0.0 --port 5000
+```
+
+<Warning>
+When binding to `0.0.0.0`, ensure you have appropriate security measures in place. Windows-MCP operates with full system access and can perform irreversible operations.
+</Warning>
+
+## Transport Comparison
+
+| Feature | stdio | SSE | streamable-http |
+|---------|-------|-----|----------------|
+| **Local Connection** | ✅ | ❌ | ❌ |
+| **Network Access** | ❌ | ✅ | ✅ |
+| **Production Ready** | ❌ | ⚠️ | ✅ |
+| **Real-time Updates** | ✅ | ✅ | ✅ |
+| **Requires Host/Port** | ❌ | ✅ | ✅ |
+| **Use Case** | Local MCP clients | Network development | Production deployment |
+
+## Remote Mode Transport
+
+When using [Remote Mode](/configuration/environment-variables#remote-mode), Windows-MCP acts as a proxy to windowsmcp.io. The transport configuration applies to both local and remote modes:
+
+```bash
+# Remote mode with stdio (default)
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp
+
+# Remote mode with SSE
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp --transport sse --host localhost --port 8000
+
+# Remote mode with streamable-http
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp --transport streamable-http --host localhost --port 8000
+```
+
+See [Environment Variables](/configuration/environment-variables) for more details on remote mode configuration.
+
+## Choosing the Right Transport
+
+<AccordionGroup>
+  <Accordion title="Use stdio when...">
+    - You're running Windows-MCP locally on the same machine as your MCP client (Claude Desktop, Cursor, etc.)
+    - You don't need network access to the server
+    - You want the simplest possible setup
+    - You're developing or testing locally
+  </Accordion>
+
+  <Accordion title="Use SSE when...">
+    - You need network access to Windows-MCP
+    - You're building a development or testing environment with network access
+    - You want server-sent events for real-time updates
+    - You need a simpler alternative to full HTTP streaming
+  </Accordion>
+
+  <Accordion title="Use streamable-http when...">
+    - You're deploying Windows-MCP in a production environment
+    - You need robust HTTP streaming capabilities
+    - You require network access with production-grade reliability
+    - You're integrating with systems that expect standard HTTP protocols
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="sliders" href="/configuration/environment-variables">
+    Configure remote mode and customize server behavior
+  </Card>
+  <Card title="Security" icon="shield" href="/security">
+    Learn about security considerations for network-accessible deployments
+  </Card>
+</CardGroup>

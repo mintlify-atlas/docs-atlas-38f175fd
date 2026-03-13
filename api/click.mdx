@@ -1,0 +1,171 @@
+---
+title: "Click"
+description: "Perform mouse clicks at coordinates or UI elements"
+---
+
+## Overview
+
+The Click tool performs mouse clicks at specified screen coordinates or on UI elements identified by their label ID from Snapshot. Supports left, right, and middle button clicks with single, double, or hover-only modes.
+
+## Parameters
+
+<ParamField path="loc" type="list[int]" optional>
+  Screen coordinates `[x, y]` where to click. Either `loc` or `label` must be provided.
+</ParamField>
+
+<ParamField path="label" type="int" optional>
+  Label ID of a UI element from Snapshot output. Either `loc` or `label` must be provided.
+</ParamField>
+
+<ParamField path="button" type="string" default="left">
+  Mouse button to use:
+  - `"left"` - Primary button for selection/activation
+  - `"right"` - Secondary button for context menus
+  - `"middle"` - Middle button (scroll wheel click)
+</ParamField>
+
+<ParamField path="clicks" type="int" default="1">
+  Number of clicks:
+  - `0` - Hover only (no click)
+  - `1` - Single click (select/focus)
+  - `2` - Double click (open/activate)
+</ParamField>
+
+## Return Value
+
+Returns a success message indicating the click action performed and coordinates.
+
+Example: `"Single left clicked at (150,200)."`
+
+## Examples
+
+### Click at Coordinates
+
+```json
+{
+  "loc": [500, 300],
+  "button": "left",
+  "clicks": 1
+}
+```
+
+Performs a single left-click at coordinates (500, 300).
+
+### Click on UI Element by Label
+
+```json
+{
+  "label": 42,
+  "button": "left",
+  "clicks": 1
+}
+```
+
+Clicks the UI element with label ID 42 from the latest Snapshot.
+
+### Double-Click to Open
+
+```json
+{
+  "loc": [150, 200],
+  "clicks": 2
+}
+```
+
+Double-clicks at (150, 200) to open a file or application.
+
+### Right-Click for Context Menu
+
+```json
+{
+  "label": 18,
+  "button": "right",
+  "clicks": 1
+}
+```
+
+Right-clicks element 18 to open its context menu.
+
+### Hover Without Clicking
+
+```json
+{
+  "loc": [400, 250],
+  "clicks": 0
+}
+```
+
+Moves the mouse to (400, 250) and hovers without clicking (useful for triggering tooltips).
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Button Activation" icon="mouse-pointer">
+    Click buttons, links, and interactive UI elements
+  </Card>
+  <Card title="File/Folder Operations" icon="folder-open">
+    Double-click to open files and folders in File Explorer
+  </Card>
+  <Card title="Context Menus" icon="bars">
+    Right-click to access context menus and options
+  </Card>
+  <Card title="Tooltip Display" icon="circle-info">
+    Hover over elements to display tooltips and help text
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Tip>
+Use label IDs from Snapshot instead of hardcoded coordinates for more robust automation that adapts to window positioning.
+</Tip>
+
+<Steps>
+  <Step title="Call Snapshot first">
+    Get the latest UI state and label IDs before clicking
+  </Step>
+  <Step title="Use label IDs when possible">
+    Prefer `label` over `loc` for UI elements to handle window repositioning
+  </Step>
+  <Step title="Add Wait after clicks">
+    Use Wait tool after clicks to allow UI to update before next action
+  </Step>
+  <Step title="Verify success with Snapshot">
+    Capture a new Snapshot after important clicks to confirm the expected state change
+  </Step>
+</Steps>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Either loc or label must be provided">
+    You must specify either `loc` (coordinates) or `label` (element ID), not both.
+  </Accordion>
+  <Accordion title="Desktop state is empty. Please call Snapshot first">
+    When using `label`, you must call Snapshot first to populate the desktop state with UI elements.
+  </Accordion>
+  <Accordion title="Failed to find element with label X">
+    The label ID is not in the current Snapshot. Call Snapshot again to refresh element list.
+  </Accordion>
+  <Accordion title="Location must be a list of exactly 2 integers [x, y]">
+    The `loc` parameter must be an array with exactly two numbers: `[x, y]`.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Details
+
+- **Coordinate system**: Uses virtual desktop coordinates (multi-monitor aware)
+- **Click timing**: ~20ms between down and up events for single clicks
+- **DPI awareness**: Coordinates are automatically scaled for high-DPI displays
+- **Implementation**: Uses Windows UIAutomation API for precise clicking
+
+## Related Tools
+
+- [Snapshot](/api/snapshot) - Get UI element label IDs and coordinates
+- [Move](/api/move) - Move mouse without clicking or drag items
+- [Type](/api/type) - Enter text after clicking on input fields
+- [MultiSelect](/api/multi-select) - Click multiple elements with Ctrl key
+
+## Implementation
+
+Source: `src/windows_mcp/__main__.py:282-320`

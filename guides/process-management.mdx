@@ -1,0 +1,457 @@
+---
+title: 'Process Management'
+description: 'Monitor and control running processes with the Process tool'
+icon: 'list-check'
+---
+
+## Overview
+
+The Process tool provides comprehensive process management capabilities, allowing LLM agents to monitor system resources and terminate unresponsive or unwanted processes. This is essential for:
+
+- Monitoring system resource usage
+- Identifying resource-intensive applications
+- Terminating hung or unresponsive processes
+- Managing background applications
+- Troubleshooting performance issues
+
+## Process Tool Modes
+
+The Process tool operates in two modes:
+
+<CardGroup cols={2}>
+  <Card title="list" icon="list">
+    List running processes with filtering and sorting options
+  </Card>
+  <Card title="kill" icon="xmark">
+    Terminate processes by PID or name
+  </Card>
+</CardGroup>
+
+## Listing Processes
+
+### Basic Process Listing
+
+List all running processes, sorted by memory usage:
+
+```python
+# List top 20 processes by memory
+Process(
+    mode='list',
+    sort_by='memory',  # Default: 'memory'
+    limit=20          # Default: 20
+)
+```
+
+**Returns:** Formatted table with:
+- **PID**: Process ID
+- **Name**: Process name
+- **CPU%**: CPU usage percentage
+- **Memory**: Memory usage in MB
+
+### Sorting Options
+
+<Tabs>
+  <Tab title="By Memory">
+    ```python
+    # Sort by memory usage (highest first)
+    Process(
+        mode='list',
+        sort_by='memory',
+        limit=20
+    )
+    ```
+    
+    **Use case:** Identify memory-hungry applications
+  </Tab>
+  
+  <Tab title="By CPU">
+    ```python
+    # Sort by CPU usage (highest first)
+    Process(
+        mode='list',
+        sort_by='cpu',
+        limit=20
+    )
+    ```
+    
+    **Use case:** Find processes causing high CPU load
+  </Tab>
+  
+  <Tab title="By Name">
+    ```python
+    # Sort alphabetically by name
+    Process(
+        mode='list',
+        sort_by='name',
+        limit=50
+    )
+    ```
+    
+    **Use case:** Browse all processes alphabetically
+  </Tab>
+</Tabs>
+
+### Filtering by Name
+
+Search for specific processes using fuzzy name matching:
+
+```python
+# Find all Chrome-related processes
+Process(
+    mode='list',
+    name='chrome',
+    sort_by='memory'
+)
+```
+
+**Name matching:** Uses fuzzy matching (60% threshold), so partial names work:
+- `'chrome'` matches `chrome.exe`, `Chrome Helper`, etc.
+- `'python'` matches `python.exe`, `python3.exe`, etc.
+- `'code'` matches `Code.exe`, `Code Helper.exe`, etc.
+
+### Customizing Result Limit
+
+```python
+# Show top 50 processes
+Process(
+    mode='list',
+    sort_by='memory',
+    limit=50
+)
+
+# Show only top 5 memory consumers
+Process(
+    mode='list',
+    sort_by='memory',
+    limit=5
+)
+```
+
+## Terminating Processes
+
+<Warning>
+**Destructive operation:** Terminating processes can cause data loss if applications have unsaved work. Always verify the correct process before termination.
+</Warning>
+
+### Kill by Process ID (PID)
+
+Most reliable method - terminate using the exact process ID:
+
+```python
+# Graceful termination by PID
+Process(
+    mode='kill',
+    pid=12345
+)
+```
+
+### Kill by Process Name
+
+Terminate all processes matching the name:
+
+```python
+# Kill all processes named 'notepad.exe'
+Process(
+    mode='kill',
+    name='notepad'
+)
+```
+
+<Note>
+**Multiple matches:** If multiple processes have the same name, all will be terminated.
+</Note>
+
+### Force Kill
+
+Use force kill when graceful termination fails:
+
+```python
+# Force kill unresponsive process
+Process(
+    mode='kill',
+    pid=12345,
+    force=True
+)
+```
+
+**Difference:**
+- **Normal kill** (`force=False`): Sends termination request, allows cleanup
+- **Force kill** (`force=True`): Immediately terminates, no cleanup
+
+## Complete Workflow Examples
+
+### Example 1: Identify and Kill Memory Hog
+
+<Steps>
+  <Step title="List top memory consumers">
+    ```python
+    # Find processes using most memory
+    processes = Process(
+        mode='list',
+        sort_by='memory',
+        limit=10
+    )
+    ```
+    
+    Output shows table:
+    ```
+    PID    Name                CPU%    Memory
+    8432   chrome.exe          5.2%    1250.3 MB
+    6712   code.exe            2.1%    890.7 MB
+    ...
+    ```
+  </Step>
+
+  <Step title="Identify the problem process">
+    Review the list and identify the process to terminate (e.g., PID 8432).
+  </Step>
+
+  <Step title="Terminate the process">
+    ```python
+    # Kill by PID
+    Process(
+        mode='kill',
+        pid=8432
+    )
+    ```
+  </Step>
+
+  <Step title="Verify termination">
+    ```python
+    # Check if process is gone
+    Process(
+        mode='list',
+        name='chrome',
+        limit=20
+    )
+    ```
+  </Step>
+</Steps>
+
+### Example 2: Clean Up Background Processes
+
+```python
+# List all processes to review
+all_processes = Process(
+    mode='list',
+    sort_by='name',
+    limit=100
+)
+
+# Identify unwanted background processes
+# Then terminate them one by one
+Process(mode='kill', name='unwanted_app')
+
+# Verify cleanup
+Process(
+    mode='list',
+    sort_by='memory',
+    limit=20
+)
+```
+
+### Example 3: Terminate Hung Application
+
+```python
+# Try graceful termination first
+result = Process(
+    mode='kill',
+    name='hung_app',
+    force=False
+)
+
+# If graceful termination fails, use force
+if 'access denied' in result.lower() or 'failed' in result.lower():
+    Process(
+        mode='kill',
+        name='hung_app',
+        force=True
+    )
+```
+
+### Example 4: Monitor System Resources
+
+```python
+# Monitor CPU-intensive processes
+cpu_hogs = Process(
+    mode='list',
+    sort_by='cpu',
+    limit=5
+)
+
+# Monitor memory usage
+memory_hogs = Process(
+    mode='list',
+    sort_by='memory',
+    limit=5
+)
+
+# Alert if any process exceeds threshold
+# (Agent would parse output and check values)
+Notification(
+    title='Resource Alert',
+    message='High resource usage detected'
+)
+```
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="Kill unresponsive application">
+    ```python
+    # List processes to find PID
+    Process(mode='list', name='not_responding_app')
+    
+    # Try graceful kill first
+    Process(mode='kill', pid=12345, force=False)
+    
+    # Force kill if needed
+    Process(mode='kill', pid=12345, force=True)
+    ```
+  </Accordion>
+
+  <Accordion title="Close all instances of an application">
+    ```python
+    # Kill all Chrome windows/processes
+    Process(mode='kill', name='chrome')
+    
+    # Verify all instances are closed
+    Process(mode='list', name='chrome')
+    ```
+  </Accordion>
+
+  <Accordion title="Find process using high CPU">
+    ```python
+    # List by CPU usage
+    Process(
+        mode='list',
+        sort_by='cpu',
+        limit=10
+    )
+    
+    # Kill the offending process
+    Process(mode='kill', pid=<pid_from_list>)
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor specific application">
+    ```python
+    # Check if application is running and its resource usage
+    Process(
+        mode='list',
+        name='my_application',
+        sort_by='memory'
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Clean up after automation">
+    ```python
+    # After running automation tasks, clean up
+    Process(mode='kill', name='temporary_app')
+    Process(mode='kill', name='helper_process')
+    
+    # Verify cleanup
+    Process(mode='list', sort_by='name', limit=50)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Process not found">
+    **Error:** `No process with PID 12345 found` or `No process matching "name" found`
+    
+    **Causes:**
+    - Process already terminated
+    - Incorrect PID or name
+    - Process name misspelled
+    
+    **Solutions:**
+    - Run `list` mode first to verify process exists
+    - Check PID/name spelling
+    - Process may have already terminated naturally
+  </Accordion>
+
+  <Accordion title="Access denied">
+    **Error:** `Access denied to kill PID 12345`
+    
+    **Causes:**
+    - Insufficient privileges
+    - System process (protected)
+    - Process running as different user
+    
+    **Solutions:**
+    - Try with `force=True`
+    - May require administrator privileges
+    - Some system processes cannot be terminated
+  </Accordion>
+
+  <Accordion title="No processes found">
+    **Error:** `No processes found matching "name"`
+    
+    **Causes:**
+    - Name filter too specific
+    - Process not running
+    - Fuzzy matching threshold not met
+    
+    **Solutions:**
+    - Use shorter/partial name
+    - List all processes without name filter
+    - Check if application is actually running
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+**Always list before killing:** Run `list` mode first to identify the correct PID, then use PID to kill. This is more reliable than name-based killing.
+</Tip>
+
+<Tip>
+**Try graceful termination first:** Use `force=False` (default) initially. Only use `force=True` if the process doesn't respond to graceful termination.
+</Tip>
+
+<Tip>
+**Be specific with names:** When using name-based operations, use unique parts of the process name to avoid unwanted matches.
+</Tip>
+
+<Warning>
+**System processes:** Avoid terminating system processes (e.g., `svchost.exe`, `csrss.exe`, `winlogon.exe`) as this can cause system instability.
+</Warning>
+
+<Warning>
+**Data loss:** Terminating processes forcefully causes immediate shutdown without saving. Graceful termination allows cleanup.
+</Warning>
+
+## Process Information Details
+
+### What each metric means:
+
+**PID (Process ID)**
+- Unique identifier for each running process
+- Used for precise process targeting
+- Changes each time application starts
+
+**Name**
+- Executable name (e.g., `chrome.exe`, `python.exe`)
+- Multiple processes can have same name
+- Case-insensitive for matching
+
+**CPU%**
+- Percentage of CPU time used
+- Can exceed 100% on multi-core systems
+- Averaged over recent time period
+
+**Memory**
+- RAM usage in megabytes (MB)
+- RSS (Resident Set Size) - physical memory
+- Does not include swap/virtual memory
+
+## Related Tools
+
+- [App](/api/app) - Launch and manage application windows
+- [PowerShell](/api/shell) - Advanced process management with scripts
+- [Notification](/api/notification) - Alert user about process issues
+- [Snapshot](/api/snapshot) - View active applications in desktop state

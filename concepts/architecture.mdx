@@ -1,0 +1,326 @@
+---
+title: 'Architecture'
+description: 'Understand the layered service architecture of Windows-MCP'
+icon: 'layer-group'
+---
+
+## Overview
+
+Windows-MCP follows a **layered service architecture** that bridges AI LLM agents with the Windows operating system through the Model Context Protocol (MCP). The architecture separates concerns into distinct service layers, each responsible for specific aspects of Windows automation.
+
+```
+┌─────────────────────────────────────────┐
+│         FastMCP Server (Entry)          │
+│    15 MCP Tools + Analytics Wrapper     │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│         Desktop Service Layer           │
+│  Window Ops, Screenshots, Input, State  │
+└────────────────┬────────────────────────┘
+                 │
+      ┌──────────┼──────────┐
+      ▼          ▼          ▼
+┌─────────┐ ┌────────┐ ┌─────────┐
+│  Tree   │ │WatchDog│ │   VDM   │
+│ Service │ │Service │ │ Service │
+└────┬────┘ └────────┘ └─────────┘
+     │
+┌────▼────────────────────────────────────┐
+│     UIAutomation Wrapper (UIA)          │
+│  Controls, Patterns, Events, Enums      │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Layer Breakdown
+
+### Entry Point Layer
+
+**File**: `src/windows_mcp/__main__.py`
+
+The entry point registers all 15 MCP tools on a FastMCP server instance and manages the application lifecycle.
+
+**Key Responsibilities**:
+- Tool registration and routing
+- Async lifespan management (initialization and cleanup)
+- Service initialization (Desktop, WatchDog, Analytics)
+- Transport layer configuration (stdio, SSE, streamable-http)
+- Remote mode proxy setup
+
+**Implementation Details**:
+- Each tool function delegates to Desktop service methods
+- Tools are wrapped with `@with_analytics` decorator for telemetry
+- Lifespan context manager initializes services before server starts
+- Supports both local and remote operation modes
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastMCP):
+    global desktop, watchdog, analytics, screen_size
+    
+    # Initialize components
+    if os.getenv("ANONYMIZED_TELEMETRY", "true").lower() != "false":
+        analytics = PostHogAnalytics()
+    desktop = Desktop()
+    watchdog = WatchDog()
+    screen_size = desktop.get_screen_size()
+    watchdog.set_focus_callback(desktop.tree.on_focus_change)
+    
+    try:
+        watchdog.start()
+        await asyncio.sleep(1)
+        yield
+    finally:
+        if watchdog:
+            watchdog.stop()
+        if analytics:
+            await analytics.close()
+```
+
+---
+
+### Desktop Service Layer
+
+**File**: `src/windows_mcp/desktop/service.py`
+
+**Data Models**: `src/windows_mcp/desktop/views.py`
+
+The high-level orchestrator that manages all Windows desktop operations.
+
+**Key Responsibilities**:
+- Window management (launch, resize, switch, enumerate)
+- Screenshot capture and annotation
+- Mouse and keyboard input simulation
+- Desktop state aggregation
+- PowerShell command execution
+- Clipboard operations
+- Process management
+- Registry access
+- Notification display
+
+**Key Methods**:
+- `get_state()`: Captures complete desktop state including windows, UI tree, and screenshot
+- `app()`: Launches, switches, or resizes applications
+- `click()`, `type()`, `scroll()`, `move()`: Input simulation
+- `execute_command()`: PowerShell command execution with UTF-8 encoding
+- `scrape()`: Web content fetching via HTTP
+
+**Data Models**:
+- `DesktopState`: Complete snapshot of desktop (windows, active window, screenshot, tree state)
+- `Window`: Window metadata (name, status, bounding box, handle, process ID)
+- `Size`: Width and height dimensions
+- `BoundingBox`: Rectangle coordinates (left, top, right, bottom, width, height)
+- `Status`: Window state enum (NORMAL, MINIMIZED, MAXIMIZED, HIDDEN)
+
+---
+
+### Tree Service Layer
+
+**File**: `src/windows_mcp/tree/service.py`
+
+**Data Models**: `src/windows_mcp/tree/views.py`
+
+**Configuration**: `src/windows_mcp/tree/config.py`
+
+Captures the Windows accessibility tree from active and background windows, identifying interactive and scrollable UI elements.
+
+**Key Responsibilities**:
+- UI Automation tree traversal
+- Interactive element discovery (buttons, text fields, links, etc.)
+- Scrollable region detection
+- Browser DOM extraction (special mode for web content)
+- Multi-threaded UI element fetching with retry logic
+- Focus change detection integration
+
+**Key Methods**:
+- `get_state()`: Returns complete tree state with interactive/scrollable nodes
+- `get_nodes()`: Processes a single window handle to extract UI elements
+- `tree_traversal()`: Recursive tree traversal with caching
+- `on_focus_change()`: Callback handler for focus events from WatchDog
+
+**Data Models**:
+- `TreeState`: Complete accessibility tree snapshot
+- `TreeElementNode`: Interactive UI element (name, type, bounding box, metadata)
+- `ScrollElementNode`: Scrollable region with scroll position
+- `TextElementNode`: Informative text content (for DOM mode)
+
+**Performance Optimizations**:
+- Cache requests for batch property retrieval
+- Sequential processing to avoid COM apartment threading deadlock
+- Configurable retry logic (`THREAD_MAX_RETRIES=3`)
+- Browser detection triggers specialized DOM extraction
+
+---
+
+### UIAutomation Wrapper Layer
+
+**Directory**: `src/windows_mcp/uia/`
+
+Low-level abstraction over the Windows UIAutomation COM API via `comtypes`.
+
+**Components**:
+
+<AccordionGroup>
+  <Accordion title="core.py - Main Automation Object">
+    Wraps the IUIAutomation COM interface and provides core automation functionality.
+    
+    **Key Classes**:
+    - `_AutomationClient`: Singleton for UIAutomation COM client
+    - Global functions for cursor, keyboard, mouse operations
+    - Screen size and rectangle utilities
+  </Accordion>
+
+  <Accordion title="controls.py - Control Wrappers">
+    Python wrappers for UIAutomation control types.
+    
+    **Control Types**:
+    - `Control`: Base control class
+    - `WindowControl`, `ButtonControl`, `EditControl`
+    - `CheckBoxControl`, `ComboBoxControl`, `SliderControl`
+    - `ListControl`, `MenuControl`, `PaneControl`
+    - And more specialized controls
+  </Accordion>
+
+  <Accordion title="patterns.py - UIAutomation Patterns">
+    Wrappers for UIAutomation control patterns.
+    
+    **Pattern Types**:
+    - `ScrollPattern`: Scrolling capabilities
+    - `InvokePattern`: Button invocation
+    - `ValuePattern`: Value get/set
+    - `TextPattern`: Text manipulation
+    - `WindowPattern`: Window state management
+  </Accordion>
+
+  <Accordion title="enums.py - COM Enumerations">
+    All UIAutomation enumerations and constants.
+    
+    **Key Enums**:
+    - `PatternId`: Pattern identifiers
+    - `PropertyId`: Property identifiers
+    - `TreeScope`: Tree traversal scope
+    - `ToggleState`, `ExpandCollapseState`: Control states
+  </Accordion>
+
+  <Accordion title="events.py - Event Handling">
+    Event subscription and handler infrastructure.
+    
+    **Event Types**:
+    - Focus changed events
+    - Structure changed events
+    - Property changed events
+  </Accordion>
+</AccordionGroup>
+
+---
+
+### WatchDog Service
+
+**File**: `src/windows_mcp/watchdog/service.py`
+
+Runs in a separate thread monitoring UI Automation events to keep the accessibility tree current.
+
+**Key Responsibilities**:
+- Focus change monitoring via UIAutomation events
+- Structure change detection (optional)
+- Property change monitoring (optional)
+- Event pumping in dedicated STA thread
+- Safe handler registration/unregistration
+
+**Threading Model**:
+- Runs in dedicated daemon thread
+- Uses COM Single-Threaded Apartment (STA)
+- Event callbacks execute in main thread context
+- Graceful shutdown with cleanup
+
+**Implementation**:
+```python
+watchdog = WatchDog()
+watchdog.set_focus_callback(desktop.tree.on_focus_change)
+watchdog.start()
+```
+
+---
+
+### Virtual Desktop Manager (VDM)
+
+**File**: `src/windows_mcp/vdm/core.py`
+
+Tracks which windows belong to which Windows virtual desktop (Windows 10/11).
+
+**Key Functions**:
+- `get_current_desktop()`: Returns active virtual desktop info
+- `get_all_desktops()`: Lists all virtual desktops
+- `is_window_on_current_desktop()`: Checks window visibility
+
+**Usage**: Desktop service uses VDM to filter windows by virtual desktop, ensuring only visible windows are included in state capture.
+
+---
+
+### Analytics Service
+
+**File**: `src/windows_mcp/analytics.py`
+
+Optional PostHog telemetry for usage tracking.
+
+**Key Features**:
+- Tracks tool names and error counts only
+- Does NOT track arguments, outputs, or sensitive data
+- Disabled via `ANONYMIZED_TELEMETRY=false` environment variable
+- `@with_analytics` decorator wraps tool functions
+
+---
+
+## Key Design Decisions
+
+<CardGroup cols={2}>
+  <Card title="Screenshot Token Efficiency" icon="image">
+    Screenshots are capped to 1920×1080 to reduce token usage while maintaining usability for vision models.
+  </Card>
+  
+  <Card title="UIA Input Coordination" icon="mouse-pointer">
+    Mouse and keyboard input uses UIAutomation coordinates (not win32 screen coordinates) to avoid DPI scaling mismatches.
+  </Card>
+  
+  <Card title="Browser DOM Mode" icon="globe">
+    Browser detection (Chrome, Edge, Firefox) triggers special DOM extraction that filters out browser UI chrome and focuses on web page content.
+  </Card>
+  
+  <Card title="Fuzzy Matching" icon="search">
+    Uses `thefuzz` library for fuzzy string matching when finding windows and apps by name (70% similarity threshold).
+  </Card>
+  
+  <Card title="Retry Logic" icon="rotate">
+    UI element fetching includes retry logic with exponential backoff (`THREAD_MAX_RETRIES=3`) to handle transient UI loading states.
+  </Card>
+  
+  <Card title="Sequential Processing" icon="list">
+    Tree traversal processes windows sequentially to avoid COM apartment threading deadlocks in UIAutomation.
+  </Card>
+</CardGroup>
+
+---
+
+## Security Context
+
+<Warning>
+  Windows-MCP has **full system access** with no sandboxing. Tools like Shell and App can perform irreversible operations. 
+  
+  **Recommended deployment**: Windows VM or Windows Sandbox environment.
+</Warning>
+
+---
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Operation Modes" icon="circle-nodes" href="/concepts/modes">
+    Learn about Local vs Remote modes and transport options
+  </Card>
+  
+  <Card title="Tools Overview" icon="wrench" href="/concepts/tools-overview">
+    Explore all 15 MCP tools and their capabilities
+  </Card>
+</CardGroup>

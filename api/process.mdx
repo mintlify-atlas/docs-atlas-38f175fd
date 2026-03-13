@@ -1,0 +1,407 @@
+---
+title: 'Process'
+description: 'List and manage running Windows processes'
+icon: 'list-check'
+---
+
+## Overview
+
+The **Process** tool provides comprehensive process management capabilities, allowing you to list running processes with detailed information (CPU, memory usage) and terminate processes by name or PID.
+
+<Info>
+**Keywords:** task manager, running tasks, kill, terminate, stop process, PID, CPU, memory usage
+</Info>
+
+## Modes
+
+The Process tool operates in two modes:
+
+<CardGroup cols={2}>
+  <Card title="list" icon="list">
+    View running processes with filtering and sorting options
+  </Card>
+  <Card title="kill" icon="skull">
+    Terminate processes by PID or name
+  </Card>
+</CardGroup>
+
+## Parameters
+
+<ParamField path="mode" type="string" required>
+  The operation mode. Must be either `"list"` or `"kill"`.
+  
+  ```python
+  mode="list"  # List processes
+  mode="kill"  # Terminate process
+  ```
+</ParamField>
+
+### List Mode Parameters
+
+<ParamField path="name" type="string">
+  Filter processes by name (case-insensitive substring match). Only processes containing this string in their name will be listed.
+  
+  ```python
+  name="chrome"  # Find all Chrome-related processes
+  ```
+</ParamField>
+
+<ParamField path="sort_by" type="string" default="memory">
+  Sort results by: `"memory"`, `"cpu"`, or `"name"`.
+  
+  ```python
+  sort_by="cpu"  # Sort by CPU usage (highest first)
+  ```
+</ParamField>
+
+<ParamField path="limit" type="integer" default="20">
+  Maximum number of processes to return (top N after sorting).
+  
+  ```python
+  limit=50  # Show top 50 processes
+  ```
+</ParamField>
+
+### Kill Mode Parameters
+
+<ParamField path="name" type="string">
+  Process name to terminate. If multiple processes match, all will be terminated.
+  
+  Either `name` or `pid` must be provided for kill mode.
+  
+  ```python
+  name="notepad.exe"  # Kill all Notepad instances
+  ```
+</ParamField>
+
+<ParamField path="pid" type="integer">
+  Process ID (PID) to terminate. Targets a specific process instance.
+  
+  Either `name` or `pid` must be provided for kill mode.
+  
+  ```python
+  pid=12345  # Kill process with PID 12345
+  ```
+</ParamField>
+
+<ParamField path="force" type="boolean" default="false">
+  Force termination without allowing graceful shutdown.
+  - `false`: Normal termination (allows process to clean up)
+  - `true`: Forced termination (immediate kill)
+  
+  ```python
+  force=True  # Force kill unresponsive process
+  ```
+</ParamField>
+
+## Return Value
+
+### Mode: list
+
+Returns a formatted table of processes with columns:
+- **PID**: Process ID
+- **Name**: Process name
+- **Memory**: Memory usage (MB)
+- **CPU**: CPU usage (%)
+
+```
+PID    | Name              | Memory (MB) | CPU (%)
+-------|-------------------|-------------|--------
+12345  | chrome.exe        | 512.3       | 15.2
+67890  | python.exe        | 128.7       | 5.8
+...
+```
+
+### Mode: kill
+
+Returns confirmation message:
+
+```
+Successfully terminated process: <name> (PID: <pid>)
+```
+
+Or:
+
+```
+Terminated <count> process(es) matching '<name>'
+```
+
+## Examples
+
+### List All Processes (Top 20 by Memory)
+
+```python
+# Default listing - top 20 by memory usage
+result = process_tool(mode="list")
+# Returns formatted table of top 20 memory-consuming processes
+```
+
+### Find Specific Process
+
+```python
+# Search for Chrome processes
+result = process_tool(
+    mode="list",
+    name="chrome",
+    limit=10
+)
+# Returns all Chrome-related processes
+```
+
+### Sort by CPU Usage
+
+```python
+# Find top CPU consumers
+result = process_tool(
+    mode="list",
+    sort_by="cpu",
+    limit=15
+)
+# Returns top 15 processes by CPU usage
+```
+
+### List All Python Processes
+
+```python
+# Find all Python-related processes
+result = process_tool(
+    mode="list",
+    name="python",
+    sort_by="memory",
+    limit=100
+)
+# Returns all Python processes sorted by memory
+```
+
+### Kill Process by PID
+
+```python
+# Terminate specific process
+result = process_tool(
+    mode="kill",
+    pid=12345
+)
+# Returns: "Successfully terminated process: app.exe (PID: 12345)"
+```
+
+### Kill Process by Name
+
+```python
+# Close all Notepad windows
+result = process_tool(
+    mode="kill",
+    name="notepad.exe"
+)
+# Returns: "Terminated 3 process(es) matching 'notepad.exe'"
+```
+
+### Force Kill Unresponsive Application
+
+```python
+# Force terminate frozen application
+result = process_tool(
+    mode="kill",
+    name="frozen_app.exe",
+    force=True
+)
+# Immediately terminates without waiting for graceful shutdown
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Resource Monitoring" icon="chart-line">
+    Monitor CPU and memory usage of running applications.
+  </Card>
+  <Card title="Task Management" icon="tasks">
+    List and identify processes for troubleshooting or optimization.
+  </Card>
+  <Card title="Application Control" icon="power-off">
+    Terminate unresponsive or unwanted processes programmatically.
+  </Card>
+  <Card title="Cleanup Automation" icon="broom">
+    Automatically close temporary or test processes after operations.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Mode must be either 'list' or 'kill'">
+    **Error:** `'Error: mode must be either "list" or "kill".'`
+    
+    **Cause:** Invalid mode parameter provided.
+    
+    **Solution:** Use only `mode="list"` or `mode="kill"`.
+  </Accordion>
+  
+  <Accordion title="Process not found">
+    **Error:** `"Error managing processes: Process not found"`
+    
+    **Cause:** The specified PID doesn't exist, or no processes match the name filter.
+    
+    **Solution:** 
+    - List processes first to verify PID or name
+    - Check if the process has already terminated
+    - Verify spelling of process name
+  </Accordion>
+  
+  <Accordion title="Access Denied">
+    **Error:** `"Error managing processes: Access Denied"`
+    
+    **Cause:** Insufficient permissions to terminate the process (system process or elevated process).
+    
+    **Solution:** 
+    - Run Windows-MCP with administrator privileges
+    - Use `force=True` for stubborn processes
+    - Some system processes cannot be terminated
+  </Accordion>
+  
+  <Accordion title="Error managing processes">
+    **Error:** `"Error managing processes: <details>"`
+    
+    **Cause:** Various possible causes including permissions, invalid parameters, or system errors.
+    
+    **Solution:** Check the error details for specific guidance.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="List Before Kill">
+    Always list processes first to verify the correct PID or name before terminating.
+  </Step>
+  
+  <Step title="Use PID for Precision">
+    When killing a specific instance, prefer `pid` over `name` to avoid terminating multiple processes.
+  </Step>
+  
+  <Step title="Try Normal Kill First">
+    Use `force=False` (default) first to allow graceful shutdown. Only use `force=True` for unresponsive processes.
+  </Step>
+  
+  <Step title="Filter for Performance">
+    Use the `name` filter to reduce noise when searching for specific processes.
+  </Step>
+  
+  <Step title="Verify Permissions">
+    Run with appropriate permissions when managing system or elevated processes.
+  </Step>
+  
+  <Step title="Monitor Resource Usage">
+    Regularly list processes sorted by CPU or memory to identify resource hogs.
+  </Step>
+</Steps>
+
+## Technical Details
+
+### Implementation
+
+The Process tool uses system-level process management APIs:
+
+#### List Mode
+1. Enumerates all running processes
+2. Collects process information (PID, name, memory, CPU)
+3. Applies name filter if specified
+4. Sorts by specified criterion (memory, CPU, or name)
+5. Returns top N processes based on limit
+
+#### Kill Mode
+1. Locates process by PID or name
+2. Attempts termination:
+   - **Normal** (`force=False`): Sends termination signal, allows cleanup
+   - **Force** (`force=True`): Immediately terminates without cleanup
+3. Returns confirmation or error
+
+### Process Information
+
+- **Memory**: Reported in MB (working set size)
+- **CPU**: Percentage of CPU time over recent interval
+- **Name**: Executable name (e.g., `chrome.exe`, `python.exe`)
+- **PID**: Unique process identifier
+
+### Sorting Behavior
+
+- **memory**: Descending (highest memory usage first)
+- **cpu**: Descending (highest CPU usage first)  
+- **name**: Alphabetical ascending
+
+### Termination Behavior
+
+| force=False | force=True |
+|-------------|------------|
+| Sends WM_CLOSE message | Terminates immediately |
+| Allows cleanup (save, etc.) | No cleanup opportunity |
+| May be ignored by process | Cannot be ignored |
+| Recommended for normal use | For frozen/unresponsive apps |
+
+## Security Considerations
+
+<Warning>
+**Destructive Operation**: Killing processes can result in data loss if the process hasn't saved its work. Always verify before terminating.
+</Warning>
+
+- **System Processes**: Some critical system processes cannot or should not be terminated
+- **Permissions**: Elevated processes require admin privileges to terminate
+- **Data Loss**: Force-killed processes cannot save or clean up
+- **Dependencies**: Terminating a process may affect dependent processes
+
+## Common Patterns
+
+### Find and Kill Pattern
+
+```python
+# 1. Find the process
+processes = process_tool(
+    mode="list",
+    name="myapp"
+)
+print(processes)
+
+# 2. Verify and kill by PID
+result = process_tool(
+    mode="kill",
+    pid=12345  # PID from list output
+)
+```
+
+### Resource Monitoring Loop
+
+```python
+# Monitor top memory consumers
+import time
+
+for i in range(5):
+    print(f"\n--- Check {i+1} ---")
+    result = process_tool(
+        mode="list",
+        sort_by="memory",
+        limit=10
+    )
+    print(result)
+    time.sleep(60)  # Check every minute
+```
+
+### Cleanup After Testing
+
+```python
+# Launch test apps
+app_tool(mode="launch", name="test_app_1.exe")
+app_tool(mode="launch", name="test_app_2.exe")
+
+# ... run tests ...
+
+# Cleanup
+process_tool(mode="kill", name="test_app_1.exe")
+process_tool(mode="kill", name="test_app_2.exe")
+```
+
+## Related Tools
+
+- [**App**](/api/app) - Launch and manage applications
+- [**PowerShell**](/api/shell) - Advanced process management with Get-Process/Stop-Process
+- [**Snapshot**](/api/snapshot) - View active windows (related to processes)
+- [**Wait**](/api/wait) - Wait for processes to start or stabilize

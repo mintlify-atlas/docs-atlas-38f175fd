@@ -1,0 +1,326 @@
+---
+title: 'Operation Modes'
+description: 'Local and Remote modes, plus transport layer options'
+icon: 'circle-nodes'
+---
+
+## Overview
+
+Windows-MCP supports two operating modes and three transport options, allowing flexible deployment from local development to cloud-hosted automation.
+
+---
+
+## Operation Modes
+
+### Local Mode (Default)
+
+<Info>
+  In **Local Mode**, Windows-MCP runs directly on your Windows machine and exposes its tools to the connected MCP client. This is the standard setup for personal use.
+</Info>
+
+**Characteristics**:
+- Server runs on the same machine as the MCP client
+- Direct access to local Windows desktop and applications
+- No additional configuration required
+- Zero network latency
+- Full access to local file system and processes
+
+**Usage**:
+
+```bash
+# Default: stdio transport (for Claude Desktop, etc.)
+uvx windows-mcp
+
+# Network-accessible via SSE
+uvx windows-mcp --transport sse --host localhost --port 8000
+
+# Network-accessible via Streamable HTTP
+uvx windows-mcp --transport streamable-http --host localhost --port 8000
+```
+
+**Environment Variables**: None required. The server operates in local mode by default.
+
+**MCP Client Configuration** (Claude Desktop):
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"]
+    }
+  }
+}
+```
+
+---
+
+### Remote Mode
+
+<Warning>
+  In **Remote Mode**, Windows-MCP acts as a **proxy client** that connects to [windowsmcp.io](https://windowsmcp.io), enabling cloud-hosted Windows automation.
+</Warning>
+
+**Characteristics**:
+- MCP client is remote (e.g., cloud-hosted Claude instance)
+- Windows-MCP runs on a Windows VM and connects to the windowsmcp.io dashboard
+- Dashboard routes requests from remote clients to the VM
+- Requires API credentials (SANDBOX_ID and API_KEY)
+- Enables automation of remote Windows environments
+
+**Architecture**:
+
+```
+┌─────────────┐         ┌──────────────────┐         ┌──────────────┐
+│ Remote MCP  │  HTTP   │ windowsmcp.io    │  HTTP   │ Windows VM   │
+│ Client      ├────────►│ Dashboard/Proxy  ├────────►│ Windows-MCP  │
+│ (Claude)    │         │                  │         │ (Remote Mode)│
+└─────────────┘         └──────────────────┘         └──────────────┘
+```
+
+**Required Environment Variables**:
+
+| Variable | Description |
+|----------|-------------|
+| `MODE` | Set to `remote` |
+| `SANDBOX_ID` | The sandbox/VM identifier from the dashboard |
+| `API_KEY` | Your Windows-MCP API key from windowsmcp.io |
+
+**Usage**:
+
+```bash
+# Remote mode with stdio (proxies to dashboard)
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key uvx windows-mcp
+
+# Remote mode with network transport
+MODE=remote SANDBOX_ID=your-sandbox-id API_KEY=your-api-key \
+  uvx windows-mcp --transport sse --host localhost --port 8000
+```
+
+**MCP Client Configuration** (Remote):
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "uvx",
+      "args": ["windows-mcp"],
+      "env": {
+        "MODE": "remote",
+        "SANDBOX_ID": "your-sandbox-id",
+        "API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+<Note>
+  Visit [windowsmcp.io](https://windowsmcp.io) to obtain your `SANDBOX_ID` and `API_KEY`.
+</Note>
+
+---
+
+## Transport Options
+
+Windows-MCP supports three transport layers for MCP communication:
+
+### stdio (Standard Input/Output)
+
+**Default transport** for local MCP clients.
+
+**Characteristics**:
+- Process-to-process communication via stdin/stdout
+- Zero network overhead
+- Automatic lifecycle management
+- Used by Claude Desktop, Cursor, and similar tools
+
+**Usage**:
+
+```bash
+# Explicit stdio flag (same as default)
+uvx windows-mcp --transport stdio
+```
+
+**When to Use**:
+- Local MCP clients (Claude Desktop, Perplexity Desktop, etc.)
+- Single-machine development
+- No network access required
+
+---
+
+### SSE (Server-Sent Events)
+
+**Network transport** using HTTP Server-Sent Events.
+
+**Characteristics**:
+- HTTP-based streaming protocol
+- Server pushes events to client
+- Requires host and port configuration
+- Suitable for web-based MCP clients
+
+**Usage**:
+
+```bash
+uvx windows-mcp --transport sse --host localhost --port 8000
+```
+
+**Command-Line Options**:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `localhost` | Host to bind the SSE server |
+| `--port` | `8000` | Port to bind the SSE server |
+
+**When to Use**:
+- Network-accessible MCP server
+- Web-based clients
+- Development with remote debugging
+
+---
+
+### streamable-http (HTTP Streaming)
+
+**Recommended network transport** for production use.
+
+**Characteristics**:
+- HTTP streaming protocol
+- More robust than SSE for long-lived connections
+- Better error handling and reconnection logic
+- FastMCP's recommended transport for network access
+
+**Usage**:
+
+```bash
+uvx windows-mcp --transport streamable-http --host localhost --port 8000
+```
+
+**Command-Line Options**:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `localhost` | Host to bind the HTTP server |
+| `--port` | `8000` | Port to bind the HTTP server |
+
+**When to Use**:
+- Production network deployments
+- Enterprise integrations
+- Scenarios requiring robust connection handling
+
+---
+
+## Implementation Details
+
+### Mode Detection
+
+The server reads the `MODE` environment variable at startup:
+
+```python
+config = Config(
+    mode=os.getenv("MODE", "local").lower(),
+    sandbox_id=os.getenv("SANDBOX_ID", ""),
+    api_key=os.getenv("API_KEY", "")
+)
+```
+
+**Local Mode**: Runs the FastMCP server directly with the specified transport.
+
+**Remote Mode**: Creates a proxy client that connects to the windowsmcp.io backend:
+
+```python
+client = AuthClient(api_key=config.api_key, sandbox_id=config.sandbox_id)
+client.authenticate()
+backend = StreamableHttpTransport(
+    url=client.proxy_url,
+    headers=client.proxy_headers
+)
+proxy_mcp = FastMCP.as_proxy(ProxyClient(backend), name="windows-mcp")
+```
+
+### Transport Selection
+
+The `--transport` flag controls how the MCP server communicates:
+
+```python
+match transport:
+    case "stdio":
+        mcp.run(transport="stdio", show_banner=False)
+    case "sse" | "streamable-http":
+        mcp.run(transport=transport, host=host, port=port, show_banner=False)
+    case _:
+        raise ValueError(f"Invalid transport: {transport}")
+```
+
+---
+
+## Comparison Table
+
+| Feature | Local + stdio | Local + HTTP | Remote + stdio | Remote + HTTP |
+|---------|---------------|--------------|----------------|---------------|
+| **Use Case** | Desktop clients | Network clients | Cloud-hosted VM | Enterprise deployment |
+| **Setup Complexity** | ⭐ Easy | ⭐⭐ Moderate | ⭐⭐⭐ Advanced | ⭐⭐⭐⭐ Complex |
+| **Latency** | Lowest | Low | Moderate | Moderate |
+| **Network Required** | ❌ No | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Credentials** | ❌ None | ❌ None | ✅ API Key | ✅ API Key |
+| **Security Boundary** | Local process | Local network | Internet | Internet |
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Local Development" icon="laptop-code">
+    Use **Local Mode** with **stdio transport** for fastest development iteration:
+    
+    ```bash
+    uvx windows-mcp
+    ```
+    
+    Configure your MCP client to launch Windows-MCP as a subprocess.
+  </Accordion>
+
+  <Accordion title="Network Testing" icon="network-wired">
+    Use **Local Mode** with **streamable-http** for network-accessible testing:
+    
+    ```bash
+    uvx windows-mcp --transport streamable-http --host 0.0.0.0 --port 8000
+    ```
+    
+    Connect from remote MCP clients on your local network.
+  </Accordion>
+
+  <Accordion title="Cloud Automation" icon="cloud">
+    Use **Remote Mode** with a Windows VM on [windowsmcp.io](https://windowsmcp.io):
+    
+    ```bash
+    MODE=remote SANDBOX_ID=... API_KEY=... uvx windows-mcp
+    ```
+    
+    Your MCP client remains local while automating a remote Windows environment.
+  </Accordion>
+
+  <Accordion title="Production Deployment" icon="server">
+    Use **Remote Mode** with **streamable-http** for robust production:
+    
+    ```bash
+    MODE=remote SANDBOX_ID=... API_KEY=... \
+      uvx windows-mcp --transport streamable-http --host 0.0.0.0 --port 8000
+    ```
+    
+    Deploy behind a reverse proxy with TLS termination.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="layer-group" href="/concepts/architecture">
+    Understand the layered service architecture
+  </Card>
+  
+  <Card title="Tools Overview" icon="wrench" href="/concepts/tools-overview">
+    Explore all 15 MCP tools
+  </Card>
+</CardGroup>

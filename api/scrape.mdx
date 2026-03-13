@@ -1,0 +1,202 @@
+---
+title: 'Scrape'
+description: 'Fetch and extract web page content from URLs'
+icon: 'globe'
+---
+
+## Overview
+
+The **Scrape** tool fetches web page content from a URL and returns clean, extracted information. By default, it performs a lightweight HTTP request and uses LLM processing to return a concise summary, avoiding context bloat. It can also extract content from the active browser tab's DOM when websites block direct HTTP requests.
+
+<Info>
+**Keywords:** scrape, fetch, browse, web, URL, extract, download, read webpage
+</Info>
+
+## Parameters
+
+<ParamField path="url" type="string" required>
+  The URL of the web page to scrape. Must be a valid HTTP or HTTPS URL.
+  
+  ```python
+  "https://example.com/page"
+  ```
+</ParamField>
+
+<ParamField path="query" type="string">
+  Optional query to focus extraction on specific information. When provided with `use_sampling=True`, the LLM will prioritize extracting content related to this query.
+  
+  ```python
+  "pricing information"
+  ```
+</ParamField>
+
+<ParamField path="use_dom" type="boolean" default="false">
+  When `true`, extracts content from the active browser tab's DOM instead of making an HTTP request. Required when websites block direct HTTP access or when you need to scrape content that requires JavaScript rendering.
+  
+  <Warning>
+  When using `use_dom=True`, the URL must already be open in the active browser tab. The tool will extract the DOM content from the currently visible page.
+  </Warning>
+  
+  ```python
+  use_dom=True
+  ```
+</ParamField>
+
+<ParamField path="use_sampling" type="boolean" default="true">
+  When `true`, the scraped content is processed by an LLM to extract meaningful information and remove boilerplate (navigation, ads, footers, etc.). Set to `false` to get raw HTML content without processing.
+  
+  ```python
+  use_sampling=False  # Get raw content
+  ```
+</ParamField>
+
+## Return Value
+
+Returns a string containing the scraped content with the following format:
+
+```
+URL: <url>
+Content:
+<extracted_content>
+```
+
+### When use_dom=True
+
+Additionally includes scroll status indicators:
+- "Reached top" or "Scroll up to see more" (header)
+- "Reached bottom" or "Scroll down to see more" (footer)
+
+## Examples
+
+### Basic Web Scraping
+
+```python
+result = scrape_tool(
+    url="https://example.com/documentation"
+)
+# Returns: Clean, LLM-processed summary of the page
+```
+
+### Focused Extraction with Query
+
+```python
+result = scrape_tool(
+    url="https://example.com/pricing",
+    query="pricing plans and features"
+)
+# Returns: Content focused on pricing information
+```
+
+### DOM-Based Scraping
+
+```python
+# First, ensure the page is open in the browser
+# Then extract DOM content
+result = scrape_tool(
+    url="https://app.example.com/dashboard",
+    use_dom=True
+)
+# Returns: Content from the active browser tab's DOM
+```
+
+### Raw Content Extraction
+
+```python
+result = scrape_tool(
+    url="https://example.com/data",
+    use_sampling=False
+)
+# Returns: Raw HTML/text without LLM processing
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Documentation Research" icon="book">
+    Extract information from documentation pages, API references, and knowledge bases.
+  </Card>
+  <Card title="Price Monitoring" icon="dollar-sign">
+    Scrape pricing pages to compare products or track price changes.
+  </Card>
+  <Card title="Content Extraction" icon="file-text">
+    Extract article content, blog posts, or news articles for analysis.
+  </Card>
+  <Card title="Web App Content" icon="browser">
+    Access content from single-page applications that require DOM extraction.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="No DOM information found">
+    **Error:** `"No DOM information found. Please open {url} in browser first."`
+    
+    **Cause:** `use_dom=True` was used but the URL is not open in the active browser tab.
+    
+    **Solution:** Open the URL in a browser first, or use `use_dom=False` for direct HTTP scraping.
+  </Accordion>
+  
+  <Accordion title="HTTP Request Failed">
+    **Cause:** The website blocks HTTP requests, requires authentication, or the URL is invalid.
+    
+    **Solution:** Try using `use_dom=True` after opening the page in a browser, or check the URL validity.
+  </Accordion>
+  
+  <Accordion title="LLM Sampling Not Supported">
+    **Cause:** The client doesn't support LLM sampling (ctx.sample() fails).
+    
+    **Solution:** The tool automatically falls back to returning raw content when sampling is unavailable.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Start with Default Settings">
+    Use default parameters (`use_dom=False`, `use_sampling=True`) for most web scraping tasks. This provides clean, concise content.
+  </Step>
+  
+  <Step title="Use query for Focused Extraction">
+    Provide a specific query when you need to extract particular information from large pages.
+  </Step>
+  
+  <Step title="Use DOM Mode for Dynamic Content">
+    Switch to `use_dom=True` when:
+    - The website blocks direct HTTP requests
+    - Content requires JavaScript rendering
+    - You need to scrape authenticated pages
+  </Step>
+  
+  <Step title="Disable Sampling for Structured Data">
+    Set `use_sampling=False` when you need raw HTML/XML or structured data that shouldn't be processed.
+  </Step>
+</Steps>
+
+## Technical Details
+
+### HTTP Mode (use_dom=False)
+- Performs a lightweight HTTP GET request to the URL
+- Extracts text content from HTML
+- Processes content through LLM for clean extraction (when `use_sampling=True`)
+- Does not execute JavaScript or render dynamic content
+
+### DOM Mode (use_dom=True)
+- Extracts content from the active browser tab's accessibility tree
+- Includes only informative text nodes (not UI chrome)
+- Provides scroll position indicators
+- Requires the page to be already open in the browser
+
+### LLM Processing (use_sampling=True)
+- Removes navigation menus, cookie banners, ads, and footer links
+- Preserves important data, facts, and content structure
+- Limited to 2048 tokens maximum output
+- Focuses on the query if provided
+
+## Related Tools
+
+- [**Snapshot**](/api/snapshot) - Capture the full desktop state including browser content
+- [**FileSystem**](/api/filesystem) - Read and write local files
+- [**PowerShell**](/api/shell) - Execute `Invoke-WebRequest` for advanced HTTP operations

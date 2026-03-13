@@ -1,0 +1,370 @@
+---
+title: 'Browser Automation'
+description: 'Automate web browsers using DOM mode, Snapshot, and Scrape tools'
+icon: 'browser'
+---
+
+## Overview
+
+Windows-MCP provides powerful browser automation capabilities that enable LLM agents to interact with web pages. The system offers two distinct approaches for web automation:
+
+- **DOM Mode**: Extracts web page elements using the browser's accessibility tree
+- **HTTP Scraping**: Fetches and processes web content directly via HTTP requests
+
+Both approaches work with major browsers including Chrome, Edge, and Firefox.
+
+## DOM Mode for Browser Content
+
+DOM mode extracts web page elements exclusively, filtering out browser UI (address bar, tabs, toolbars) for cleaner automation.
+
+### Using Snapshot with DOM Mode
+
+The Snapshot tool with `use_dom=True` captures only web page content:
+
+```python
+# Capture web page elements only
+snapshot = Snapshot(
+    use_dom=True,
+    use_vision=False,  # Optional: include screenshot
+    use_annotation=True  # Optional: add bounding boxes
+)
+```
+
+**What DOM mode returns:**
+- Interactive web elements (links, buttons, form fields)
+- Textual content nodes
+- Scroll position information
+- Element coordinates for interaction
+
+**What DOM mode filters out:**
+- Browser address bar
+- Navigation buttons (back, forward, refresh)
+- Browser tabs
+- Browser toolbars and extensions
+- Operating system UI
+
+### DOM Mode Example Workflow
+
+<Steps>
+  <Step title="Open the browser and navigate">
+    Use the App tool to launch the browser, then navigate to your target URL:
+    
+    ```python
+    App(mode='launch', name='chrome')
+    Wait(duration=2)
+    Type(loc=[500, 50], text='https://example.com', press_enter=True)
+    Wait(duration=3)
+    ```
+  </Step>
+
+  <Step title="Capture web page state with DOM mode">
+    Use Snapshot with `use_dom=True` to extract page elements:
+    
+    ```python
+    snapshot = Snapshot(use_dom=True, use_vision=True)
+    ```
+    
+    Returns:
+    - Interactive elements: buttons, links, inputs (with labels)
+    - Scroll status: "Scroll down to see more" or "Reached bottom"
+    - Clean web page content without browser UI
+  </Step>
+
+  <Step title="Interact with page elements">
+    Click buttons or fill forms using the label or coordinates:
+    
+    ```python
+    # Click using element label (from Snapshot)
+    Click(label=5, button='left', clicks=1)
+    
+    # Or fill a form field
+    Type(label=12, text='search query', press_enter=True)
+    ```
+  </Step>
+
+  <Step title="Scroll and capture more content">
+    Scroll the page and re-capture to see new elements:
+    
+    ```python
+    Scroll(type='vertical', direction='down', wheel_times=5)
+    Wait(duration=1)
+    snapshot = Snapshot(use_dom=True)
+    ```
+  </Step>
+</Steps>
+
+### DOM Mode Best Practices
+
+<AccordionGroup>
+  <Accordion title="When to use DOM mode">
+    - Interacting with dynamic web applications
+    - Filling forms and clicking buttons
+    - Navigating single-page applications (SPAs)
+    - When you need precise element coordinates
+    - Testing web interfaces
+  </Accordion>
+
+  <Accordion title="DOM mode limitations">
+    - Requires browser to be open and page loaded
+    - Only works with supported browsers (Chrome, Edge, Firefox)
+    - Cannot access content behind authentication walls without manual login
+    - Page must be in foreground/active window
+  </Accordion>
+
+  <Accordion title="Combining DOM mode with vision">
+    Add `use_vision=True` to see the page visually:
+    
+    ```python
+    Snapshot(use_dom=True, use_vision=True, use_annotation=True)
+    ```
+    
+    This provides both:
+    - Structured element data (labels, coordinates)
+    - Visual screenshot with bounding boxes
+  </Accordion>
+</AccordionGroup>
+
+## Web Scraping with Scrape Tool
+
+The Scrape tool fetches and processes web content via HTTP, without requiring a browser.
+
+### Basic Scraping
+
+```python
+# Lightweight scraping with LLM processing
+Scrape(
+    url='https://example.com',
+    use_sampling=True  # Default: returns LLM-processed summary
+)
+```
+
+**Returns:** Clean, concise content summary without boilerplate (navigation, ads, footers).
+
+### Focused Extraction
+
+Provide a `query` to extract specific information:
+
+```python
+# Extract pricing information only
+Scrape(
+    url='https://example.com/pricing',
+    query='pricing tiers and features',
+    use_sampling=True
+)
+```
+
+### Raw Content Extraction
+
+```python
+# Get raw HTML-to-markdown content
+Scrape(
+    url='https://example.com',
+    use_sampling=False  # No LLM processing
+)
+```
+
+### DOM-Based Scraping
+
+For sites that block HTTP requests, scrape from the active browser tab:
+
+```python
+# Open page in browser first
+App(mode='launch', name='chrome')
+Wait(duration=2)
+Type(loc=[500, 50], text='https://example.com', press_enter=True)
+Wait(duration=3)
+
+# Scrape from browser DOM
+Scrape(
+    url='https://example.com',
+    use_dom=True,  # Extract from active browser tab
+    use_sampling=True
+)
+```
+
+**Returns:** Page content with scroll status ("Scroll down to see more" or "Reached bottom").
+
+## Complete Browser Automation Examples
+
+### Example 1: Search and Extract Results
+
+<Steps>
+  <Step title="Launch browser and search">
+    ```python
+    App(mode='launch', name='chrome')
+    Wait(duration=2)
+    
+    # Navigate to search engine
+    Type(loc=[500, 50], text='https://google.com', press_enter=True)
+    Wait(duration=2)
+    ```
+  </Step>
+
+  <Step title="Capture search page with DOM mode">
+    ```python
+    snapshot = Snapshot(use_dom=True)
+    # Agent sees search box with label (e.g., label=3)
+    ```
+  </Step>
+
+  <Step title="Enter search query">
+    ```python
+    Type(label=3, text='Windows automation tools', press_enter=True)
+    Wait(duration=3)
+    ```
+  </Step>
+
+  <Step title="Extract results">
+    ```python
+    # Option 1: Use DOM mode for structured data
+    snapshot = Snapshot(use_dom=True, use_vision=False)
+    
+    # Option 2: Use Scrape for content summary
+    results = Scrape(
+        url='current_page_url',
+        use_dom=True,
+        query='top 5 search results with titles and descriptions'
+    )
+    ```
+  </Step>
+</Steps>
+
+### Example 2: Form Filling
+
+```python
+# Open form page
+App(mode='launch', name='edge')
+Wait(duration=2)
+Type(loc=[500, 50], text='https://example.com/contact', press_enter=True)
+Wait(duration=3)
+
+# Capture form with DOM mode
+snapshot = Snapshot(use_dom=True, use_vision=True)
+
+# Agent identifies form fields by labels
+# Fill multiple fields at once
+MultiEdit(
+    labels=[
+        [5, 'John Doe'],      # Name field (label 5)
+        [7, 'john@example.com'],  # Email field (label 7)
+        [9, 'Interested in your product']  # Message field (label 9)
+    ]
+)
+
+# Submit form
+Click(label=12, button='left', clicks=1)  # Submit button (label 12)
+Wait(duration=2)
+```
+
+### Example 3: Content Monitoring
+
+```python
+# Scrape without browser (HTTP-based)
+content = Scrape(
+    url='https://example.com/news',
+    query='latest announcements and updates',
+    use_sampling=True
+)
+
+# If site blocks HTTP requests, use browser
+if 'HTTP error' in content or 'Failed to connect' in content:
+    App(mode='launch', name='chrome')
+    Wait(duration=2)
+    Type(loc=[500, 50], text='https://example.com/news', press_enter=True)
+    Wait(duration=3)
+    
+    # Scrape from browser DOM
+    content = Scrape(
+        url='https://example.com/news',
+        use_dom=True,
+        query='latest announcements and updates'
+    )
+
+# Process content...
+```
+
+## Choosing the Right Approach
+
+<CardGroup cols={2}>
+  <Card title="Use DOM Mode When" icon="browser">
+    - Need to click buttons/links
+    - Filling forms
+    - Working with SPAs
+    - Require element coordinates
+    - Testing web interfaces
+  </Card>
+
+  <Card title="Use Scrape Tool When" icon="code">
+    - Only need to read content
+    - Want quick content extraction
+    - Don't need browser UI
+    - Monitoring/data collection
+    - Site allows HTTP requests
+  </Card>
+</CardGroup>
+
+## Tips for Reliable Browser Automation
+
+<Tip>
+**Always wait after navigation:** Pages need time to load. Use `Wait(duration=2-3)` after navigation or clicks that trigger page loads.
+</Tip>
+
+<Tip>
+**Check scroll status:** DOM mode tells you if more content exists. Scroll down when you see "Scroll down to see more".
+</Tip>
+
+<Tip>
+**Combine approaches:** Use Scrape for quick content checks, then switch to DOM mode for interaction when needed.
+</Tip>
+
+<Warning>
+**Browser must be in foreground:** DOM mode only works when the browser window is active and visible (not minimized).
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="DOM mode returns empty elements">
+    **Causes:**
+    - Page hasn't finished loading
+    - Browser window is minimized or hidden
+    - Wrong browser tab is active
+    
+    **Solutions:**
+    - Increase wait time after navigation
+    - Use `App(mode='switch', name='chrome')` to bring browser to foreground
+    - Check that correct tab is active
+  </Accordion>
+
+  <Accordion title="Scrape returns HTTP errors">
+    **Causes:**
+    - Site blocks automated requests
+    - Site requires authentication
+    - Network connectivity issues
+    
+    **Solutions:**
+    - Switch to DOM-based scraping: `Scrape(use_dom=True)`
+    - Open page in browser first, then use DOM mode
+    - Check URL is correct and accessible
+  </Accordion>
+
+  <Accordion title="Cannot click elements">
+    **Causes:**
+    - Element label is incorrect
+    - Element is not interactive
+    - Page layout changed after Snapshot
+    
+    **Solutions:**
+    - Re-run Snapshot before clicking
+    - Verify element label from Snapshot output
+    - Use coordinates directly if label doesn't work
+  </Accordion>
+</AccordionGroup>
+
+## Related Tools
+
+- [Snapshot](/api/snapshot) - Capture desktop and web page state
+- [Scrape](/api/scrape) - Fetch and process web content
+- [Click](/api/click) - Click elements on screen
+- [Type](/api/type) - Enter text into fields
+- [Scroll](/api/scroll) - Scroll pages and containers
